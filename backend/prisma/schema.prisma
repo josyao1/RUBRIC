@@ -1,0 +1,171 @@
+// Prisma Schema - works with both SQLite (local) and PostgreSQL (production)
+// Switch by changing DATABASE_URL in .env
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // Change to "postgresql" for production
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USERS (for future auth)
+// ============================================================================
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rubrics     Rubric[]
+  assignments Assignment[]
+}
+
+// ============================================================================
+// RUBRICS & CRITERIA
+// ============================================================================
+
+model Rubric {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  sourceFile  String?  // Path to uploaded file
+  rawContent  String?  // Extracted text from file
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  criteria    Criterion[]
+  assignments Assignment[]
+}
+
+model Criterion {
+  id          String @id @default(uuid())
+  name        String
+  description String?
+  maxPoints   Int    @default(10)
+  sortOrder   Int    @default(0)
+
+  rubricId String
+  rubric   Rubric @relation(fields: [rubricId], references: [id], onDelete: Cascade)
+
+  inlineComments  InlineComment[]
+  sectionFeedback SectionFeedback[]
+}
+
+// ============================================================================
+// ASSIGNMENTS & SUBMISSIONS
+// ============================================================================
+
+model Assignment {
+  id        String    @id @default(uuid())
+  name      String
+  dueDate   DateTime?
+  createdAt DateTime  @default(now())
+
+  userId   String?
+  user     User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  rubricId String?
+  rubric   Rubric? @relation(fields: [rubricId], references: [id], onDelete: SetNull)
+
+  submissions Submission[]
+}
+
+model Student {
+  id        String  @id @default(uuid())
+  name      String
+  email     String?
+  studentId String? // External student ID
+
+  submissions Submission[]
+}
+
+model Submission {
+  id            String   @id @default(uuid())
+  fileName      String
+  filePath      String
+  extractedText String?
+  status        String   @default("pending") // pending, processing, ready, reviewed
+  submittedAt   DateTime @default(now())
+
+  assignmentId String?
+  assignment   Assignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentId    String?
+  student      Student?    @relation(fields: [studentId], references: [id], onDelete: SetNull)
+
+  inlineComments  InlineComment[]
+  sectionFeedback SectionFeedback[]
+  overallFeedback OverallFeedback?
+}
+
+// ============================================================================
+// FEEDBACK SYSTEM
+// ============================================================================
+
+model InlineComment {
+  id              String @id @default(uuid())
+  startPosition   Int // Character offset start
+  endPosition     Int // Character offset end
+  highlightedText String // The actual text being commented on
+  comment         String // The feedback
+
+  submissionId String
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  criterionId  String?
+  criterion    Criterion? @relation(fields: [criterionId], references: [id], onDelete: SetNull)
+
+  thread CommentThread?
+}
+
+model SectionFeedback {
+  id             String @id @default(uuid())
+  strengths      String // JSON array
+  areasForGrowth String // JSON array
+  suggestions    String // JSON array
+
+  submissionId String
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  criterionId  String
+  criterion    Criterion  @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+}
+
+model OverallFeedback {
+  id                   String @id @default(uuid())
+  summary              String
+  priorityImprovements String // JSON array
+  encouragement        String?
+  nextSteps            String // JSON array
+
+  submissionId String     @unique
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================================
+// STUDENT CONVERSATION THREADS
+// ============================================================================
+
+model CommentThread {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  inlineCommentId String        @unique
+  inlineComment   InlineComment @relation(fields: [inlineCommentId], references: [id], onDelete: Cascade)
+
+  messages ThreadMessage[]
+}
+
+model ThreadMessage {
+  id        String   @id @default(uuid())
+  role      String // 'student' or 'assistant'
+  content   String
+  createdAt DateTime @default(now())
+
+  threadId String
+  thread   CommentThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+}

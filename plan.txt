@@ -1,18 +1,22 @@
 ================================================================================
-                              RUBRIC - Project Plan
-                     AI-Powered Grading Assistant for Educators
+                            GradeMate - Project Plan
+                  AI-Powered Constructive Feedback for Educators
 ================================================================================
 
 --------------------------------------------------------------------------------
 1. PROJECT OVERVIEW
 --------------------------------------------------------------------------------
 
-RUBRIC is a web-based application that enables educators to:
-  - Create and manage grading rubrics
+GradeMate is a web-based application that enables educators to:
+  - Create and manage feedback rubrics
   - Upload student submissions (essays, code, reports, etc.)
-  - Leverage AI to automatically grade against rubric criteria
-  - Generate individualized, criterion-specific feedback
-  - Distribute grades and feedback to students
+  - Generate AI-powered CONSTRUCTIVE FEEDBACK (not just grades)
+  - Provide INLINE COMMENTS on specific parts of student work
+  - Synthesize feedback organized by rubric sections
+  - Help students improve through actionable, specific guidance
+
+*** KEY INSIGHT: This is NOT a grading tool. It's a FEEDBACK tool. ***
+The goal is productive, constructive feedback that helps students grow.
 
 Target Users: K-12 teachers, university professors, TAs, instructors
 
@@ -23,9 +27,9 @@ Target Users: K-12 teachers, university professors, TAs, instructors
 ================================================================================
   IMPLEMENTATION PRIORITY ORDER:
 
-    1. RUBRIC UPLOAD PIPELINE    <- Teachers upload existing rubrics
-    2. STUDENT WORK PIPELINE     <- Upload student submissions
-    3. GRADING PIPELINE          <- AI grades against rubric
+    1. RUBRIC UPLOAD PIPELINE      <- Teachers upload existing rubrics
+    2. STUDENT WORK PIPELINE       <- Upload student submissions
+    3. FEEDBACK PIPELINE           <- AI generates constructive feedback
 
   Everything else is secondary/supporting infrastructure.
 ================================================================================
@@ -37,7 +41,7 @@ Phase 1: Foundation
 
 Phase 2: Rubric Upload Pipeline  [PRIORITY 1]
   [ ] File upload for rubrics (PDF, DOCX, Excel/CSV, images)
-  [ ] AI parsing to extract criteria, descriptions, point values
+  [ ] AI parsing to extract criteria, descriptions, expectations
   [ ] Teacher review/confirm extracted rubric structure
   [ ] Manual rubric builder as fallback/editing tool
   [ ] Rubric versioning and reuse across assignments
@@ -49,512 +53,406 @@ Phase 3: Student Work Pipeline  [PRIORITY 2]
   [ ] Submission status tracking
   [ ] Support for various submission types (essays, code, reports)
 
-Phase 4: Grading Pipeline  [PRIORITY 3]
+Phase 4: Feedback Pipeline  [PRIORITY 3]
   [ ] AI API integration (OpenAI/Anthropic)
-  [ ] Rubric-to-prompt engineering
-  [ ] Per-criterion scoring with justification
-  [ ] Overall feedback generation
-  [ ] Confidence scoring for flagging edge cases
-  [ ] Batch/queue processing for multiple submissions
+  [ ] INLINE COMMENTS: Specific feedback on exact parts of submission
+  [ ] RUBRIC-SECTION FEEDBACK: Synthesized feedback per criterion
+  [ ] OVERALL SYNTHESIS: Constructive summary with actionable next steps
+  [ ] Batch processing for multiple submissions
+  [ ] Teacher review/edit before releasing to students
 
 Phase 5: Review & Distribution
-  [ ] Teacher review interface (approve/edit AI grades)
-  [ ] Grade override capability
-  [ ] Export to CSV/Excel
-  [ ] Email distribution (optional)
-  [ ] Student portal (future consideration)
+  [ ] Teacher review interface (edit AI feedback before release)
+  [ ] Export feedback reports
+  [ ] Student portal (view feedback)
+  [ ] Student follow-up conversations (ask questions on any comment)
+  [ ] Context-aware LLM responses (rubric + submission + comment context)
 
 --------------------------------------------------------------------------------
-3. TECHNICAL ARCHITECTURE
+3. FEEDBACK MODEL (CRITICAL)
+--------------------------------------------------------------------------------
+
+*** THIS IS THE CORE VALUE PROPOSITION ***
+
+When a student submits work (e.g., an essay), GradeMate produces:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  FEEDBACK STRUCTURE                                                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  1. INLINE COMMENTS (like Google Docs)                                      │
+│     - Attached to specific sentences/paragraphs/lines                       │
+│     - Example: Highlight "The war started because..." with comment:         │
+│       "Consider adding a specific date or event to strengthen this claim"   │
+│     - Stored as: { start: 45, end: 72, comment: "...", criterion: "..." }   │
+│                                                                             │
+│  2. RUBRIC-SECTION FEEDBACK (at the end)                                    │
+│     For each rubric criterion, provide:                                     │
+│     ┌─────────────────────────────────────────────────────────────────┐     │
+│     │  THESIS STATEMENT                                               │     │
+│     │  ─────────────────────────────────────────────────────────────  │     │
+│     │  Strengths:                                                     │     │
+│     │  • Your thesis clearly states your position on X                │     │
+│     │  • Good use of argumentative language                           │     │
+│     │                                                                 │     │
+│     │  Areas for Growth:                                              │     │
+│     │  • Consider making your thesis more specific by...              │     │
+│     │  • Try to address the counterargument in your thesis            │     │
+│     │                                                                 │     │
+│     │  Suggestions:                                                   │     │
+│     │  • Revise to: "While X, this essay argues Y because Z"          │     │
+│     └─────────────────────────────────────────────────────────────────┘     │
+│     (Repeat for each rubric section: Evidence, Organization, etc.)          │
+│                                                                             │
+│  3. OVERALL SYNTHESIS                                                       │
+│     - Summary of key strengths across all criteria                          │
+│     - Top 2-3 priority areas for improvement                                │
+│     - Encouraging, growth-oriented tone                                     │
+│     - Actionable next steps                                                 │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+--------------------------------------------------------------------------------
+4. TECHNICAL ARCHITECTURE
 --------------------------------------------------------------------------------
 
 Frontend:
   - Framework: React + TypeScript
-  - UI Library: Tailwind CSS + shadcn/ui (professional, accessible)
+  - UI Library: Tailwind CSS
   - State Management: React Context or Zustand
   - File Handling: react-dropzone
+  - Document Viewer: Custom component with inline comment support
 
 Backend:
-  - Framework: Node.js + Express (or Python FastAPI)
-  - Authentication: JWT + bcrypt
-  - File Processing: Multer (Node) or python-multipart
-  - PDF Parsing: pdf-parse / PyPDF2
-  - DOCX Parsing: mammoth.js / python-docx
+  - Framework: Node.js + Express
+  - Database: SQLite (local) / PostgreSQL (production)
+  - File Processing: Multer
+  - PDF Parsing: pdf-parse
+  - DOCX Parsing: mammoth.js
 
-Database:
-  - PostgreSQL (relational data: users, classes, rubrics, grades)
-  - Schema tables:
-      * users (id, email, password_hash, name, created_at)
-      * classes (id, user_id, name, term, created_at)
-      * students (id, class_id, name, email, student_id)
-      * rubrics (id, user_id, name, description, created_at)
-      * criteria (id, rubric_id, name, description, max_points, order)
-      * assignments (id, class_id, rubric_id, name, due_date)
-      * submissions (id, assignment_id, student_id, file_path, status)
-      * grades (id, submission_id, criterion_id, score, feedback)
-      * overall_feedback (id, submission_id, total_score, summary)
+Database Schema:
+  rubrics
+    - id, user_id, name, description, created_at
+
+  criteria
+    - id, rubric_id, name, description, order
+
+  submissions
+    - id, assignment_id, student_id, file_path, extracted_text, status
+
+  inline_comments
+    - id, submission_id, criterion_id
+    - start_position, end_position (character offsets in text)
+    - highlighted_text (the actual text being commented on)
+    - comment (the feedback)
+
+  section_feedback
+    - id, submission_id, criterion_id
+    - strengths (text/JSON array)
+    - areas_for_growth (text/JSON array)
+    - suggestions (text/JSON array)
+
+  overall_feedback
+    - id, submission_id
+    - summary, priority_improvements, next_steps
+
+  comment_threads (for student follow-up questions)
+    - id, inline_comment_id, created_at
+
+  thread_messages
+    - id, thread_id, role ('student'|'assistant'), content, created_at
 
 AI Integration:
   - Provider: Anthropic Claude API (or OpenAI GPT-4)
-  - Rate limiting and queue system for bulk grading
-  - Prompt template system for consistent grading
+  - Prompt engineering for constructive, growth-oriented feedback
+  - Structured output for inline comments + section feedback
 
 --------------------------------------------------------------------------------
-4. UI STRUCTURE & WIREFRAMES
+5. UI STRUCTURE & WIREFRAMES
 --------------------------------------------------------------------------------
 
 Navigation (Sidebar):
   +---------------------------+
-  |  [Logo] RUBRIC            |
+  |  [Logo] GradeMate         |
   +---------------------------+
   |  Dashboard                |
-  |  Classes                  |
   |  Rubrics                  |
   |  Assignments              |
-  |  Grade Center             |
+  |  Submissions              |
+  |  Feedback Review          |
   |  Settings                 |
   +---------------------------+
-  |  [User Avatar] Profile    |
-  +---------------------------+
 
-Page Layouts:
+A. FEEDBACK REVIEW INTERFACE (Most Important Screen)
 
-A. DASHBOARD
-   +---------------------------------------------------------------+
-   |  Welcome, [Teacher Name]                                      |
-   +---------------------------------------------------------------+
-   |  Quick Stats                                                  |
-   |  +-------------+  +-------------+  +-------------+            |
-   |  | 12 Classes  |  | 45 Pending  |  | 230 Graded  |            |
-   |  +-------------+  +-------------+  +-------------+            |
-   +---------------------------------------------------------------+
-   |  Recent Activity              |  Upcoming Due Dates           |
-   |  - Graded Essay #3 (2h ago)   |  - Midterm Essay (Oct 15)     |
-   |  - New submission (3h ago)    |  - Lab Report 4 (Oct 18)      |
-   +---------------------------------------------------------------+
+  +-----------------------------------------------------------------------+
+  |  Feedback: John Smith - Midterm Essay              [Prev] [Next]      |
+  +-----------------------------------------------------------------------+
+  |                                                                       |
+  |  +-----------------------------+  +-------------------------------+   |
+  |  | STUDENT SUBMISSION          |  | FEEDBACK PANEL                |   |
+  |  | (with inline comments)      |  |                               |   |
+  |  |                             |  | [Inline Comments Tab]         |   |
+  |  | "The Civil War started      |  | [Rubric Feedback Tab]         |   |
+  |  |  [1] because of economic    |  | [Overall Tab]                 |   |
+  |  |  differences between..."    |  |                               |   |
+  |  |                             |  | ─────────────────────────     |   |
+  |  | "Lincoln believed that      |  | THESIS STATEMENT              |   |
+  |  |  [2] slavery was wrong..."  |  |                               |   |
+  |  |                             |  | Strengths:                    |   |
+  |  |  [Highlighted sections      |  | • Clear position stated       |   |
+  |  |   show where comments       |  |                               |   |
+  |  |   are attached]             |  | Areas for Growth:             |   |
+  |  |                             |  | • Add specific scope          |   |
+  |  |                             |  |                               |   |
+  |  |                             |  | ─────────────────────────     |   |
+  |  |                             |  | EVIDENCE & SUPPORT            |   |
+  |  |                             |  | ...                           |   |
+  |  +-----------------------------+  +-------------------------------+   |
+  |                                                                       |
+  |  [Edit Feedback]  [Approve & Release to Student]                      |
+  +-----------------------------------------------------------------------+
 
-B. RUBRIC BUILDER
-   +---------------------------------------------------------------+
-   |  Create New Rubric                              [Save] [Cancel]|
-   +---------------------------------------------------------------+
-   |  Name: [________________________]                              |
-   |  Description: [______________________________________________] |
-   +---------------------------------------------------------------+
-   |  Criteria                                          [+ Add Row] |
-   +---------------------------------------------------------------+
-   |  #  | Criterion Name | Description        | Max Points         |
-   +-----+----------------+--------------------+--------------------+
-   |  1  | [Thesis      ] | [Clear argument..] | [20]    [Delete]   |
-   |  2  | [Evidence    ] | [Supporting det..] | [25]    [Delete]   |
-   |  3  | [Organization] | [Logical flow...] | [20]    [Delete]   |
-   |  4  | [Grammar     ] | [Spelling, punc..] | [15]    [Delete]   |
-   |  5  | [Citations   ] | [Proper format..]  | [20]    [Delete]   |
-   +-----+----------------+--------------------+--------------------+
-   |                                          Total: 100 points     |
-   +---------------------------------------------------------------+
+B. INLINE COMMENT INTERACTION
 
-C. ASSIGNMENT VIEW
-   +---------------------------------------------------------------+
-   |  Assignment: Midterm Essay          Class: English 101        |
-   |  Due: Oct 15, 2024                  Rubric: Essay Rubric v2   |
-   +---------------------------------------------------------------+
-   |  [Upload Submissions]  [Grade All]  [Export Grades]           |
-   +---------------------------------------------------------------+
-   |  Submissions (24/30 received)                                 |
-   +---------------------------------------------------------------+
-   |  Student Name    | Status     | Score   | Actions             |
-   +-----------------+------------+---------+---------------------+
-   |  Alice Johnson   | Graded     | 92/100  | [View] [Edit]       |
-   |  Bob Smith       | Pending    | --      | [Grade]             |
-   |  Carol Williams  | In Review  | 85/100  | [View] [Approve]    |
-   +-----------------+------------+---------+---------------------+
-
-D. GRADING INTERFACE
-   +---------------------------------------------------------------+
-   |  Grading: Bob Smith - Midterm Essay           [Prev] [Next]   |
-   +---------------------------------------------------------------+
-   |  +---------------------------+  +---------------------------+ |
-   |  | STUDENT SUBMISSION        |  | RUBRIC SCORING            | |
-   |  | [PDF/Doc Viewer]          |  |                           | |
-   |  |                           |  | Thesis (20 pts)           | |
-   |  |                           |  | Score: [18] / 20          | |
-   |  |                           |  | Feedback: [AI generated.. | |
-   |  |                           |  | ________________________] | |
-   |  |                           |  |                           | |
-   |  |                           |  | Evidence (25 pts)         | |
-   |  |                           |  | Score: [22] / 25          | |
-   |  |                           |  | Feedback: [______________]| |
-   |  |                           |  |                           | |
-   |  |                           |  | [... more criteria ...]   | |
-   |  +---------------------------+  +---------------------------+ |
-   +---------------------------------------------------------------+
-   |  Overall Feedback:                                            |
-   |  [_________________________________________________________] |
-   |  Total Score: 85/100                    [Save Draft] [Submit] |
-   +---------------------------------------------------------------+
+  When teacher/AI highlights text:
+  +------------------------------------------+
+  |  "The war started because of economic"   |  <-- highlighted
+  +------------------------------------------+
+           |
+           v
+  +------------------------------------------+
+  |  Add Comment                             |
+  |  ────────────────────────────────────    |
+  |  Linked to: [Thesis v] (dropdown)        |
+  |  Comment: [________________________]     |
+  |           [________________________]     |
+  |  [Cancel]  [Save Comment]                |
+  +------------------------------------------+
 
 --------------------------------------------------------------------------------
-5. FILE STRUCTURE (SKELETON)
+6. AI FEEDBACK PROMPT TEMPLATE
 --------------------------------------------------------------------------------
 
-rubric/
-├── frontend/
-│   ├── public/
-│   │   └── index.html
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── ui/                    # Reusable UI components
-│   │   │   │   ├── Button.tsx
-│   │   │   │   ├── Card.tsx
-│   │   │   │   ├── Input.tsx
-│   │   │   │   ├── Modal.tsx
-│   │   │   │   ├── Table.tsx
-│   │   │   │   └── Sidebar.tsx
-│   │   │   ├── layout/
-│   │   │   │   ├── Header.tsx
-│   │   │   │   ├── Layout.tsx
-│   │   │   │   └── Navigation.tsx
-│   │   │   ├── rubric/
-│   │   │   │   ├── RubricBuilder.tsx
-│   │   │   │   ├── CriterionRow.tsx
-│   │   │   │   └── RubricPreview.tsx
-│   │   │   ├── grading/
-│   │   │   │   ├── GradingPanel.tsx
-│   │   │   │   ├── SubmissionViewer.tsx
-│   │   │   │   └── FeedbackEditor.tsx
-│   │   │   └── dashboard/
-│   │   │       ├── StatsCard.tsx
-│   │   │       └── ActivityFeed.tsx
-│   │   ├── pages/
-│   │   │   ├── Dashboard.tsx
-│   │   │   ├── Classes.tsx
-│   │   │   ├── Rubrics.tsx
-│   │   │   ├── Assignments.tsx
-│   │   │   ├── GradeCenter.tsx
-│   │   │   ├── Settings.tsx
-│   │   │   └── Login.tsx
-│   │   ├── hooks/
-│   │   │   ├── useAuth.ts
-│   │   │   ├── useRubrics.ts
-│   │   │   └── useGrading.ts
-│   │   ├── services/
-│   │   │   ├── api.ts
-│   │   │   ├── auth.ts
-│   │   │   └── grading.ts
-│   │   ├── types/
-│   │   │   └── index.ts
-│   │   ├── App.tsx
-│   │   └── main.tsx
-│   ├── package.json
-│   └── tailwind.config.js
-│
-├── backend/
-│   ├── src/
-│   │   ├── controllers/
-│   │   │   ├── authController.ts
-│   │   │   ├── classController.ts
-│   │   │   ├── rubricController.ts
-│   │   │   ├── assignmentController.ts
-│   │   │   └── gradingController.ts
-│   │   ├── models/
-│   │   │   ├── User.ts
-│   │   │   ├── Class.ts
-│   │   │   ├── Student.ts
-│   │   │   ├── Rubric.ts
-│   │   │   ├── Assignment.ts
-│   │   │   ├── Submission.ts
-│   │   │   └── Grade.ts
-│   │   ├── services/
-│   │   │   ├── aiGrading.ts          # AI API integration
-│   │   │   ├── fileParser.ts         # PDF/DOCX extraction
-│   │   │   └── emailService.ts       # Grade distribution
-│   │   ├── middleware/
-│   │   │   ├── auth.ts
-│   │   │   └── upload.ts
-│   │   ├── routes/
-│   │   │   ├── auth.ts
-│   │   │   ├── classes.ts
-│   │   │   ├── rubrics.ts
-│   │   │   ├── assignments.ts
-│   │   │   └── grading.ts
-│   │   ├── utils/
-│   │   │   ├── promptBuilder.ts      # Rubric-to-prompt conversion
-│   │   │   └── validators.ts
-│   │   └── index.ts
-│   ├── prisma/
-│   │   └── schema.prisma             # Database schema
-│   └── package.json
-│
-├── docs/
-│   ├── API.md
-│   └── SETUP.md
-│
-├── .env.example
-├── docker-compose.yml
-├── README.md
-└── plan.txt
+```
+You are an experienced, supportive educator providing constructive feedback
+on student work. Your goal is to help the student IMPROVE, not just to judge.
+
+RUBRIC CRITERIA:
+{rubric_criteria_with_descriptions}
+
+STUDENT SUBMISSION:
+{extracted_text}
+
+Provide feedback in the following JSON structure:
+
+{
+  "inline_comments": [
+    {
+      "highlighted_text": "exact text from submission",
+      "start_position": 0,
+      "end_position": 25,
+      "criterion": "Thesis Statement",
+      "comment": "Consider strengthening this by..."
+    }
+  ],
+  "section_feedback": [
+    {
+      "criterion": "Thesis Statement",
+      "strengths": ["Clear position", "Argumentative tone"],
+      "areas_for_growth": ["Could be more specific"],
+      "suggestions": ["Try: 'While X argues Y, this essay contends Z'"]
+    }
+  ],
+  "overall_feedback": {
+    "summary": "This essay demonstrates strong understanding of...",
+    "top_priorities": ["Focus on X", "Develop Y further"],
+    "encouragement": "You're making great progress on...",
+    "next_steps": ["For your next draft, try..."]
+  }
+}
+
+IMPORTANT GUIDELINES:
+- Be specific: Reference exact parts of the student's work
+- Be constructive: Frame feedback as opportunities for growth
+- Be actionable: Give concrete suggestions, not vague criticism
+- Be encouraging: Acknowledge what's working well
+- Aim for 5-10 inline comments spread across the submission
+- Provide 2-3 strengths and 2-3 growth areas per rubric section
+```
 
 --------------------------------------------------------------------------------
-6. DEVELOPMENT PHASES & MILESTONES
+7. DEVELOPMENT PHASES & MILESTONES
 --------------------------------------------------------------------------------
 
-PHASE 0: Project Setup (Foundation)
+PHASE 0: Project Setup (Foundation) [DONE]
   - Initialize React frontend with Vite + TypeScript
   - Set up Express/Node backend
-  - Configure PostgreSQL with Prisma ORM
-  - Implement user authentication (register/login)
+  - Configure SQLite database
   - Create basic layout with sidebar navigation
-  - Class/assignment CRUD basics
 
 ================================================================================
   PRIORITY IMPLEMENTATION ORDER
 ================================================================================
 
 PHASE 1: RUBRIC UPLOAD PIPELINE  [PRIORITY 1]
-  - File upload endpoint for rubrics (PDF, DOCX, XLSX, CSV, images)
-  - Text/structure extraction from uploaded files
-  - AI parsing to identify: criteria names, descriptions, point values
-  - Review UI: teacher confirms/edits extracted rubric
-  - Save parsed rubric to database
-  - Manual rubric builder as fallback (if upload parsing fails)
-  - Rubric library: reuse across multiple assignments
+  - File upload endpoint for rubrics
+  - Text extraction from uploaded files
+  - Manual rubric builder
+  - Save rubrics to database
 
 PHASE 2: STUDENT WORK UPLOAD PIPELINE  [PRIORITY 2]
-  - File upload endpoint (PDF, DOCX, TXT, code files)
+  - File upload endpoint for submissions
   - Text extraction and storage
-  - Bulk upload (ZIP containing multiple files)
-  - Student roster import (CSV with names/emails)
-  - Match submissions to students (by filename or manual)
-  - Submission status tracking (uploaded, pending, graded)
+  - Bulk upload support
+  - Student matching
 
-PHASE 3: GRADING PIPELINE  [PRIORITY 3]
-  - AI API connection (Anthropic/OpenAI)
-  - Prompt engineering: convert rubric + submission to grading prompt
-  - Per-criterion scoring with specific feedback
-  - Overall feedback generation
-  - Store grades linked to submissions and rubric criteria
-  - Batch processing queue for multiple submissions
-  - Progress indicator during grading
+PHASE 3: FEEDBACK PIPELINE  [PRIORITY 3]
+  - Document viewer with highlighting support
+  - Inline comment system (add/edit/delete)
+  - Rubric-section feedback panels
+  - Overall feedback synthesis
+  - AI integration for auto-generating feedback
+  - Teacher review/edit workflow
 
 ================================================================================
-  SECONDARY PHASES (After Core Pipeline Works)
+  SECONDARY PHASES
 ================================================================================
 
-PHASE 4: Review & Polish
-  - Teacher review/approval workflow
-  - Grade override and manual editing
-  - Export functionality (CSV/Excel)
-  - Dashboard analytics
-  - UI polish and responsive design
-
-PHASE 5: Distribution & Future
-  - Email grade distribution
-  - Student portal (view-only access)
-  - LMS integration consideration (Canvas, Blackboard API)
-  - Plagiarism detection integration (optional)
+PHASE 4: Polish & Distribution
+  - Feedback export (PDF report)
+  - Student portal for viewing feedback
+  - Email notifications
+  - Analytics dashboard
 
 --------------------------------------------------------------------------------
-7. RUBRIC UPLOAD PIPELINE (DETAILED)
+8. STUDENT INTERACTION & FOLLOW-UP CONVERSATIONS
 --------------------------------------------------------------------------------
 
-Teachers already have rubrics in various formats. The system must intelligently
-parse these into a structured format.
+Students can interact with feedback by asking follow-up questions on any comment.
+This creates a threaded, context-aware conversation powered by LLM.
 
-Supported Input Formats:
-  - PDF (most common - exported from Word, LMS, etc.)
-  - DOCX/DOC (Word documents)
-  - XLSX/CSV (spreadsheet rubrics with rows/columns)
-  - Images (PNG, JPG - scanned or screenshot rubrics)
-  - Plain text / Markdown
+INTERACTION FLOW:
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  INLINE COMMENT (from AI/Teacher)                                       │
+  │  ─────────────────────────────────────────────────────────────────────  │
+  │  "Consider adding a specific date or event to strengthen this claim."   │
+  │                                                                         │
+  │  [Ask a question...]                                                    │
+  │                                                                         │
+  │  ─── Conversation Thread ───                                            │
+  │                                                                         │
+  │  Student: "What kind of date would work here? I'm not sure what         │
+  │            events are relevant to this argument."                       │
+  │                                                                         │
+  │  AI: "Great question! Since you're discussing the economic causes       │
+  │       of the Civil War, you could reference:                            │
+  │       • The Tariff of 1828 ("Tariff of Abominations")                   │
+  │       • The Panic of 1857                                               │
+  │       • The publication of 'The Impending Crisis' (1857)                │
+  │       Any of these would ground your claim in historical fact."         │
+  │                                                                         │
+  │  Student: "Thanks! Would the Tariff of 1828 work even though it's       │
+  │            30+ years before the war?"                                   │
+  │                                                                         │
+  │  AI: "Yes! In fact, referencing earlier events shows the long           │
+  │       build-up of tensions. You could write: 'Economic divisions,       │
+  │       evident as early as the Tariff of 1828, festered for decades...'  │
+  │       This demonstrates historical depth."                              │
+  │                                                                         │
+  └─────────────────────────────────────────────────────────────────────────┘
 
-Extraction Process:
-  1. UPLOAD: Teacher uploads rubric file
-  2. EXTRACT: System extracts raw text/structure
-     - PDF: pdf-parse or pdfjs
-     - DOCX: mammoth.js
-     - Excel: xlsx library
-     - Images: OCR via Tesseract or cloud vision API
-  3. AI PARSE: Send extracted content to AI with prompt:
-     ```
-     Parse this rubric into structured JSON. Extract:
-     - Rubric title
-     - Each criterion with:
-       - Name
-       - Description/expectations
-       - Point value (or weight)
-       - Performance levels if present (Excellent/Good/Fair/Poor)
+CONTEXT PROVIDED TO AI FOR FOLLOW-UP:
+  {
+    "conversation_context": {
+      "rubric": { ... },                    // Full rubric for reference
+      "criterion": "Thesis Statement",      // Which rubric section
+      "submission_excerpt": "...",          // Relevant part of submission
+      "full_submission": "...",             // Full text if needed
+      "original_comment": "...",            // The feedback being discussed
+      "conversation_history": [             // Previous messages in thread
+        { "role": "student", "content": "..." },
+        { "role": "assistant", "content": "..." }
+      ]
+    }
+  }
 
-     Raw rubric content:
-     {extracted_text}
-     ```
-  4. REVIEW: Display parsed rubric to teacher for confirmation
-     - Show side-by-side: original file | parsed structure
-     - Allow inline editing of any field
-     - Add/remove criteria as needed
-  5. SAVE: Store confirmed rubric in database
+DATABASE ADDITIONS:
+  comment_threads
+    - id
+    - inline_comment_id (links to the original comment)
+    - created_at
 
-Rubric Database Schema:
-  rubrics
-    - id, user_id, name, description, source_file_path, created_at
+  thread_messages
+    - id
+    - thread_id
+    - role ('student' | 'assistant')
+    - content
+    - created_at
 
-  criteria
-    - id, rubric_id, name, description, max_points, order
+UI REQUIREMENTS:
+  - Each inline comment has an expandable thread
+  - Student types question, hits send
+  - AI responds with context-aware guidance
+  - Teacher can view all student conversations (optional)
+  - Conversation stays focused on that specific feedback point
 
-  performance_levels (optional, for detailed rubrics)
-    - id, criterion_id, level_name, level_description, points
-
-UI Flow:
-  +---------------------------------------------------------------+
-  |  Upload Rubric                                                 |
-  +---------------------------------------------------------------+
-  |  [Drag & drop file here or click to browse]                   |
-  |  Supported: PDF, Word, Excel, Images                          |
-  +---------------------------------------------------------------+
-            |
-            v
-  +---------------------------------------------------------------+
-  |  Parsing Rubric...  [===========         ] 60%                |
-  +---------------------------------------------------------------+
-            |
-            v
-  +---------------------------------------------------------------+
-  |  Review Extracted Rubric                    [Save] [Re-upload]|
-  +---------------------------------------------------------------+
-  |  Original File          |  Extracted Structure                |
-  |  [PDF Preview]          |  Name: [Argumentative Essay Rubric] |
-  |                         |                                     |
-  |                         |  Criteria:                          |
-  |                         |  1. Thesis Statement    [25] pts    |
-  |                         |     [Clear, arguable claim...]      |
-  |                         |  2. Evidence & Support  [25] pts    |
-  |                         |     [Relevant examples...]          |
-  |                         |  [+ Add Criterion]                  |
-  +---------------------------------------------------------------+
-
---------------------------------------------------------------------------------
-8. STUDENT WORK UPLOAD PIPELINE (DETAILED)
---------------------------------------------------------------------------------
-
-Input Methods:
-  - Single file upload (one student at a time)
-  - Bulk upload via ZIP file
-  - Folder drag-and-drop (multiple files)
-
-Supported File Types:
-  - Documents: PDF, DOCX, DOC, TXT, RTF
-  - Code: .py, .java, .js, .cpp, .c, .html, .css (syntax-aware)
-  - Spreadsheets: XLSX, CSV (for data-based assignments)
-
-Student Matching:
-  - By filename convention: "LastName_FirstName_Assignment.pdf"
-  - By roster: Upload CSV with student info, then match files
-  - Manual: Teacher assigns uploaded files to students
-
-Workflow:
-  1. Teacher selects assignment
-  2. Uploads file(s)
-  3. System extracts text content
-  4. System attempts to match to students (if roster exists)
-  5. Teacher confirms/fixes matches
-  6. Submissions marked as "Ready for Grading"
-
-UI Flow:
-  +---------------------------------------------------------------+
-  |  Upload Submissions for: [Midterm Essay]                      |
-  +---------------------------------------------------------------+
-  |  [Drag files here or click to browse]                         |
-  |  Or upload ZIP file for bulk import                           |
-  +---------------------------------------------------------------+
-  |  Uploaded Files (12)                        [Match to Roster] |
-  +---------------------------------------------------------------+
-  |  Filename                    | Matched Student | Status       |
-  +-----------------------------+-----------------+--------------+
-  |  Smith_John_Essay.pdf       | John Smith      | Ready        |
-  |  jane_doe_final.pdf         | Jane Doe        | Ready        |
-  |  essay_v2.pdf               | [Select...]     | Needs Match  |
-  +-----------------------------+-----------------+--------------+
-  |                                      [Confirm & Start Grading]|
-  +---------------------------------------------------------------+
+AI GUIDELINES FOR FOLLOW-UP:
+  - Stay focused on the specific comment/criterion
+  - Be helpful and educational, not just give answers
+  - Guide student toward improvement, don't rewrite for them
+  - Reference their actual submission when relevant
+  - Keep responses concise but thorough
 
 --------------------------------------------------------------------------------
-9. AI GRADING APPROACH
+9. DATA FLOW
 --------------------------------------------------------------------------------
 
-Prompt Template Structure:
-```
-You are an experienced educator grading a student submission.
+1. Teacher uploads rubric
+   └─> Extracted & stored in database
 
-RUBRIC:
-{rubric_criteria_with_descriptions}
+2. Teacher uploads student submission
+   └─> Text extracted & stored
 
-STUDENT SUBMISSION:
-{extracted_text}
+3. Teacher clicks "Generate Feedback"
+   └─> AI analyzes submission against rubric
+   └─> Returns: inline comments + section feedback + overall synthesis
 
-For each criterion, provide:
-1. Score (out of max points)
-2. Specific feedback citing evidence from the submission
-3. Suggestions for improvement
+4. Teacher reviews AI feedback
+   └─> Can edit/add/remove comments
+   └─> Can modify section feedback
 
-Finally, provide overall feedback summarizing strengths and areas for growth.
-
-Respond in JSON format:
-{
-  "criteria_scores": [
-    {"criterion": "...", "score": X, "feedback": "..."},
-    ...
-  ],
-  "total_score": X,
-  "overall_feedback": "..."
-}
-```
-
-Key Considerations:
-  - Consistency: Same rubric should yield similar grades for similar work
-  - Transparency: AI must cite specific evidence for scores
-  - Teacher Override: All AI grades are suggestions until approved
-  - Edge Cases: Flag low-confidence scores for manual review
+5. Teacher approves & releases
+   └─> Feedback visible to student (future: student portal)
 
 --------------------------------------------------------------------------------
-10. SECURITY CONSIDERATIONS
+10. KEY DIFFERENCES FROM GRADING TOOLS
 --------------------------------------------------------------------------------
 
-  - Password hashing with bcrypt (min 12 rounds)
-  - JWT tokens with short expiry + refresh tokens
-  - File upload validation (type, size limits)
-  - Sanitize extracted text before AI processing
-  - Rate limiting on API endpoints
-  - CORS configuration for production
-  - Environment variables for all secrets (never commit .env)
-  - FERPA compliance considerations for student data
+| Grading Tools              | GradeMate (Feedback Tool)              |
+|----------------------------|----------------------------------------|
+| Focus on SCORES            | Focus on IMPROVEMENT                   |
+| "You got 85/100"           | "Here's how to make this stronger"     |
+| Summary judgment           | Specific, actionable inline comments   |
+| End-of-document only       | Inline + per-section + overall         |
+| Evaluative tone            | Constructive, growth-oriented tone     |
+| Student sees a number      | Student sees a roadmap for improvement |
 
 --------------------------------------------------------------------------------
-11. FUTURE ENHANCEMENTS
+11. NEXT STEPS
 --------------------------------------------------------------------------------
 
-  - Multi-user collaboration (TAs, co-teachers)
-  - Rubric templates library
-  - Grade analytics and trends over time
-  - Student self-assessment before submission
-  - Peer review workflows
-  - Integration with Google Classroom, Canvas, Blackboard
-  - Mobile-responsive design / PWA
-  - Offline grading capability
-  - Handwriting recognition for scanned assignments
-
---------------------------------------------------------------------------------
-12. GETTING STARTED (Next Steps)
---------------------------------------------------------------------------------
-
-1. Initialize the repository structure
-2. Set up frontend with React + Vite + Tailwind
-3. Set up backend with Express + Prisma
-4. Create database schema and run migrations
-5. Build authentication flow (basic)
-6. [PRIORITY 1] Implement rubric upload + AI parsing
-7. [PRIORITY 2] Implement student work upload pipeline
-8. [PRIORITY 3] Integrate AI API for grading pipeline
-9. Build teacher review/approval workflow
-10. Test end-to-end grading pipeline
+1. [x] Project scaffolding
+2. [x] Basic UI with navigation
+3. [ ] Rubric upload/builder (functional)
+4. [ ] Submission upload with text extraction
+5. [ ] Document viewer component with text selection
+6. [ ] Inline comment system
+7. [ ] Section feedback panels
+8. [ ] AI integration for feedback generation
+9. [ ] Teacher review workflow
+10. [ ] Student-facing feedback view
+11. [ ] Student follow-up conversations on comments (LLM-powered)
 
 ================================================================================
                               END OF PLAN

@@ -5,19 +5,23 @@ import {
   Upload,
   GraduationCap,
   Settings,
-  BookOpen
+  BookOpen,
+  MessageSquare
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/rubrics', icon: FileText, label: 'Rubrics' },
   { to: '/assignments', icon: BookOpen, label: 'Assignments' },
   { to: '/submissions', icon: Upload, label: 'Submissions' },
-  { to: '/grades', icon: GraduationCap, label: 'Grade Center' },
+  { to: '/feedback', icon: MessageSquare, label: 'Feedback Review' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
 export default function Layout() {
+  const { user } = useAuth();
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
@@ -52,11 +56,13 @@ export default function Layout() {
         <div className="p-4 border-t border-gray-200">
           <div className="flex items-center">
             <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
-              <span className="text-indigo-600 font-medium">T</span>
+              <span className="text-indigo-600 font-medium">
+                {user?.name?.charAt(0) || 'U'}
+              </span>
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-gray-900">Teacher</p>
-              <p className="text-xs text-gray-500">teacher@school.edu</p>
+              <p className="text-sm font-medium text-gray-900">{user?.name || 'User'}</p>
+              <p className="text-xs text-gray-500">{user?.email || ''}</p>
             </div>
           </div>
         </div>

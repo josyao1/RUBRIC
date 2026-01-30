@@ -8,6 +8,8 @@ build/
 # Database
 *.db
 *.sqlite
+prisma/dev.db
+prisma/dev.db-journal
 
 # Uploads (keep folder, ignore contents)
 backend/uploads/*

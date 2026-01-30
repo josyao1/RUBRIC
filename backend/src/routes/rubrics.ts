@@ -1,10 +1,13 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { v4 as uuidv4 } from 'uuid';
 import { fileURLToPath } from 'url';
 import { dirname, join, extname } from 'path';
 import { readFileSync } from 'fs';
-import db from '../db/database.js';
+import { createRequire } from 'module';
+import prisma from '../db/prisma.js';
+
+// Handle CommonJS modules in ESM
+const require = createRequire(import.meta.url);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -23,40 +26,42 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.csv', '.txt'];
+    const allowedTypes = ['.pdf', '.docx', '.doc', '.png', '.jpg', '.jpeg', '.webp', '.txt'];
     const ext = extname(file.originalname).toLowerCase();
     if (allowedTypes.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type'));
+      cb(new Error('Invalid file type. Supported: PDF, Word (.docx), Images (.png, .jpg), Text (.txt)'));
     }
   },
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
 // Get all rubrics
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const rubrics = db.prepare(`
-      SELECT r.*,
-        (SELECT json_group_array(json_object(
-          'id', c.id,
-          'name', c.name,
-          'description', c.description,
-          'maxPoints', c.max_points,
-          'order', c.sort_order
-        )) FROM criteria c WHERE c.rubric_id = r.id ORDER BY c.sort_order) as criteria
-      FROM rubrics r
-      ORDER BY r.created_at DESC
-    `).all();
+    const rubrics = await prisma.rubric.findMany({
+      include: {
+        criteria: {
+          orderBy: { sortOrder: 'asc' }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
 
-    // Parse criteria JSON
-    const parsed = rubrics.map((r: any) => ({
+    // Transform to match frontend expected format
+    const transformed = rubrics.map(r => ({
       ...r,
-      criteria: JSON.parse(r.criteria || '[]')
+      criteria: r.criteria.map(c => ({
+        id: c.id,
+        name: c.name,
+        description: c.description,
+        maxPoints: c.maxPoints,
+        order: c.sortOrder
+      }))
     }));
 
-    res.json(parsed);
+    res.json(transformed);
   } catch (error) {
     console.error('Error fetching rubrics:', error);
     res.status(500).json({ error: 'Failed to fetch rubrics' });
@@ -64,21 +69,31 @@ router.get('/', (req, res) => {
 });
 
 // Get single rubric
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
-    const rubric = db.prepare(`
-      SELECT * FROM rubrics WHERE id = ?
-    `).get(req.params.id) as Record<string, unknown> | undefined;
+    const rubric = await prisma.rubric.findUnique({
+      where: { id: req.params.id },
+      include: {
+        criteria: {
+          orderBy: { sortOrder: 'asc' }
+        }
+      }
+    });
 
     if (!rubric) {
       return res.status(404).json({ error: 'Rubric not found' });
     }
 
-    const criteria = db.prepare(`
-      SELECT * FROM criteria WHERE rubric_id = ? ORDER BY sort_order
-    `).all(req.params.id);
-
-    res.json({ ...rubric, criteria });
+    res.json({
+      ...rubric,
+      criteria: rubric.criteria.map(c => ({
+        id: c.id,
+        name: c.name,
+        description: c.description,
+        maxPoints: c.maxPoints,
+        order: c.sortOrder
+      }))
+    });
   } catch (error) {
     console.error('Error fetching rubric:', error);
     res.status(500).json({ error: 'Failed to fetch rubric' });
@@ -92,7 +107,6 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const id = uuidv4();
     const fileName = req.file.originalname;
     const filePath = req.file.path;
     const ext = extname(fileName).toLowerCase();
@@ -100,39 +114,49 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     // Extract text based on file type
     let rawContent = '';
     try {
-      if (ext === '.txt' || ext === '.csv') {
+      if (ext === '.txt') {
         rawContent = readFileSync(filePath, 'utf-8');
       } else if (ext === '.pdf') {
-        // PDF parsing - will need pdf-parse
-        const pdfParse = (await import('pdf-parse')).default;
+        const pdfParse = require('pdf-parse');
         const pdfBuffer = readFileSync(filePath);
         const pdfData = await pdfParse(pdfBuffer);
         rawContent = pdfData.text;
-      } else if (ext === '.docx') {
-        // DOCX parsing - will need mammoth
+      } else if (ext === '.docx' || ext === '.doc') {
         const mammoth = await import('mammoth');
         const result = await mammoth.extractRawText({ path: filePath });
         rawContent = result.value;
+      } else if (['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) {
+        // OCR for images using Tesseract.js
+        const Tesseract = await import('tesseract.js');
+        const { data: { text } } = await Tesseract.recognize(filePath, 'eng', {
+          logger: m => console.log(m) // Optional: log progress
+        });
+        rawContent = text;
       }
     } catch (parseError) {
       console.error('Error parsing file:', parseError);
       rawContent = '(Could not extract text from file)';
     }
 
-    // Create rubric entry (criteria will be added after AI parsing or manual entry)
     const rubricName = fileName.replace(/\.[^/.]+$/, '');
 
-    db.prepare(`
-      INSERT INTO rubrics (id, name, description, source_file, raw_content)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(id, rubricName, 'Uploaded rubric - awaiting parsing', filePath, rawContent);
-
-    const rubric = db.prepare('SELECT * FROM rubrics WHERE id = ?').get(id) as Record<string, unknown>;
+    const rubric = await prisma.rubric.create({
+      data: {
+        name: rubricName,
+        description: 'Uploaded rubric - awaiting parsing',
+        sourceFile: filePath,
+        rawContent: rawContent
+        // userId omitted until auth is implemented
+      },
+      include: {
+        criteria: true
+      }
+    });
 
     res.json({
       ...rubric,
       criteria: [],
-      rawContent // Send raw content so frontend can display it
+      rawContent
     });
   } catch (error) {
     console.error('Error uploading rubric:', error);
@@ -141,7 +165,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 });
 
 // Create rubric manually
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { name, description, criteria } = req.body;
 
@@ -149,36 +173,37 @@ router.post('/', (req, res) => {
       return res.status(400).json({ error: 'Name is required' });
     }
 
-    const id = uuidv4();
+    const rubric = await prisma.rubric.create({
+      data: {
+        name,
+        description: description || '',
+        // userId omitted until auth is implemented
+        criteria: {
+          create: (criteria || []).map((c: any, index: number) => ({
+            name: c.name || '',
+            description: c.description || '',
+            maxPoints: c.maxPoints || 10,
+            sortOrder: index
+          }))
+        }
+      },
+      include: {
+        criteria: {
+          orderBy: { sortOrder: 'asc' }
+        }
+      }
+    });
 
-    db.prepare(`
-      INSERT INTO rubrics (id, name, description)
-      VALUES (?, ?, ?)
-    `).run(id, name, description || '');
-
-    // Insert criteria
-    if (criteria && Array.isArray(criteria)) {
-      const insertCriterion = db.prepare(`
-        INSERT INTO criteria (id, rubric_id, name, description, max_points, sort_order)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `);
-
-      criteria.forEach((c: any, index: number) => {
-        insertCriterion.run(
-          uuidv4(),
-          id,
-          c.name || '',
-          c.description || '',
-          c.maxPoints || 10,
-          index
-        );
-      });
-    }
-
-    const rubric = db.prepare('SELECT * FROM rubrics WHERE id = ?').get(id) as Record<string, unknown>;
-    const savedCriteria = db.prepare('SELECT * FROM criteria WHERE rubric_id = ? ORDER BY sort_order').all(id);
-
-    res.status(201).json({ ...rubric, criteria: savedCriteria });
+    res.status(201).json({
+      ...rubric,
+      criteria: rubric.criteria.map(c => ({
+        id: c.id,
+        name: c.name,
+        description: c.description,
+        maxPoints: c.maxPoints,
+        order: c.sortOrder
+      }))
+    });
   } catch (error) {
     console.error('Error creating rubric:', error);
     res.status(500).json({ error: 'Failed to create rubric' });
@@ -186,41 +211,47 @@ router.post('/', (req, res) => {
 });
 
 // Update rubric
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const { name, description, criteria } = req.body;
     const { id } = req.params;
 
-    db.prepare(`
-      UPDATE rubrics SET name = ?, description = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(name, description, id);
+    // Delete existing criteria and replace
+    await prisma.criterion.deleteMany({
+      where: { rubricId: id }
+    });
 
-    // Replace criteria
-    if (criteria && Array.isArray(criteria)) {
-      db.prepare('DELETE FROM criteria WHERE rubric_id = ?').run(id);
+    const rubric = await prisma.rubric.update({
+      where: { id },
+      data: {
+        name,
+        description,
+        criteria: {
+          create: (criteria || []).map((c: any, index: number) => ({
+            name: c.name || '',
+            description: c.description || '',
+            maxPoints: c.maxPoints || 10,
+            sortOrder: index
+          }))
+        }
+      },
+      include: {
+        criteria: {
+          orderBy: { sortOrder: 'asc' }
+        }
+      }
+    });
 
-      const insertCriterion = db.prepare(`
-        INSERT INTO criteria (id, rubric_id, name, description, max_points, sort_order)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `);
-
-      criteria.forEach((c: any, index: number) => {
-        insertCriterion.run(
-          c.id || uuidv4(),
-          id,
-          c.name || '',
-          c.description || '',
-          c.maxPoints || 10,
-          index
-        );
-      });
-    }
-
-    const rubric = db.prepare('SELECT * FROM rubrics WHERE id = ?').get(id) as Record<string, unknown>;
-    const savedCriteria = db.prepare('SELECT * FROM criteria WHERE rubric_id = ? ORDER BY sort_order').all(id);
-
-    res.json({ ...rubric, criteria: savedCriteria });
+    res.json({
+      ...rubric,
+      criteria: rubric.criteria.map(c => ({
+        id: c.id,
+        name: c.name,
+        description: c.description,
+        maxPoints: c.maxPoints,
+        order: c.sortOrder
+      }))
+    });
   } catch (error) {
     console.error('Error updating rubric:', error);
     res.status(500).json({ error: 'Failed to update rubric' });
@@ -228,9 +259,11 @@ router.put('/:id', (req, res) => {
 });
 
 // Delete rubric
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    db.prepare('DELETE FROM rubrics WHERE id = ?').run(req.params.id);
+    await prisma.rubric.delete({
+      where: { id: req.params.id }
+    });
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting rubric:', error);

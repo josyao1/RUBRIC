@@ -98,13 +98,22 @@ export default function Submissions() {
         <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
         <h3 className="text-lg font-medium text-gray-900 mb-2">Upload Student Work</h3>
         <p className="text-gray-500 mb-4">Drag and drop files here, or click to browse</p>
-        <p className="text-sm text-gray-400 mb-4">Supports PDF, DOCX, TXT, and code files. You can also upload a ZIP for bulk import.</p>
+        <div className="mb-4">
+          <p className="text-sm text-gray-500 mb-2">Supported formats:</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <span className="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600">PDF</span>
+            <span className="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600">Word (.docx)</span>
+            <span className="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600">Images (.png, .jpg)</span>
+            <span className="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600">Text (.txt)</span>
+            <span className="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600">Code (.py, .js, .java)</span>
+          </div>
+        </div>
         <label className="inline-flex items-center px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 cursor-pointer">
           <input
             type="file"
             className="hidden"
             multiple
-            accept=".pdf,.docx,.doc,.txt,.py,.java,.js,.ts,.cpp,.c,.zip"
+            accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.webp,.py,.java,.js,.ts,.cpp,.c,.html,.css,.md"
             onChange={handleFileChange}
           />
           Browse Files

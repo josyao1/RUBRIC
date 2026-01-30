@@ -1,10 +1,13 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { v4 as uuidv4 } from 'uuid';
 import { fileURLToPath } from 'url';
 import { dirname, join, extname } from 'path';
 import { readFileSync } from 'fs';
-import db from '../db/database.js';
+import { createRequire } from 'module';
+import prisma from '../db/prisma.js';
+
+// Handle CommonJS modules in ESM
+const require = createRequire(import.meta.url);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -26,17 +29,23 @@ const upload = multer({
 });
 
 // Get all submissions
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const submissions = db.prepare(`
-      SELECT s.*, st.name as student_name, a.name as assignment_name
-      FROM submissions s
-      LEFT JOIN students st ON s.student_id = st.id
-      LEFT JOIN assignments a ON s.assignment_id = a.id
-      ORDER BY s.submitted_at DESC
-    `).all();
+    const submissions = await prisma.submission.findMany({
+      include: {
+        student: true,
+        assignment: true
+      },
+      orderBy: { submittedAt: 'desc' }
+    });
 
-    res.json(submissions);
+    const transformed = submissions.map(s => ({
+      ...s,
+      studentName: s.student?.name,
+      assignmentName: s.assignment?.name
+    }));
+
+    res.json(transformed);
   } catch (error) {
     console.error('Error fetching submissions:', error);
     res.status(500).json({ error: 'Failed to fetch submissions' });
@@ -54,23 +63,27 @@ router.post('/upload', upload.array('files', 100), async (req, res) => {
     const submissions = [];
 
     for (const file of req.files) {
-      const id = uuidv4();
       const ext = extname(file.originalname).toLowerCase();
 
       // Extract text based on file type
       let extractedText = '';
       try {
-        if (['.txt', '.py', '.java', '.js', '.ts', '.cpp', '.c', '.html', '.css'].includes(ext)) {
+        if (['.txt', '.py', '.java', '.js', '.ts', '.cpp', '.c', '.html', '.css', '.md'].includes(ext)) {
           extractedText = readFileSync(file.path, 'utf-8');
         } else if (ext === '.pdf') {
-          const pdfParse = (await import('pdf-parse')).default;
+          const pdfParse = require('pdf-parse');
           const pdfBuffer = readFileSync(file.path);
           const pdfData = await pdfParse(pdfBuffer);
           extractedText = pdfData.text;
-        } else if (ext === '.docx') {
+        } else if (ext === '.docx' || ext === '.doc') {
           const mammoth = await import('mammoth');
           const result = await mammoth.extractRawText({ path: file.path });
           extractedText = result.value;
+        } else if (['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) {
+          // OCR for images (e.g., scanned handwritten work)
+          const Tesseract = await import('tesseract.js');
+          const { data: { text } } = await Tesseract.recognize(file.path, 'eng');
+          extractedText = text;
         }
       } catch (parseError) {
         console.error('Error parsing file:', parseError);
@@ -83,22 +96,30 @@ router.post('/upload', upload.array('files', 100), async (req, res) => {
       // Create or find student
       let studentId = null;
       if (studentName) {
-        let student = db.prepare('SELECT id FROM students WHERE name = ?').get(studentName) as { id: string } | undefined;
+        let student = await prisma.student.findFirst({
+          where: { name: studentName }
+        });
         if (!student) {
-          studentId = uuidv4();
-          db.prepare('INSERT INTO students (id, name) VALUES (?, ?)').run(studentId, studentName);
-        } else {
-          studentId = student.id;
+          student = await prisma.student.create({
+            data: { name: studentName }
+          });
         }
+        studentId = student.id;
       }
 
-      db.prepare(`
-        INSERT INTO submissions (id, assignment_id, student_id, file_name, file_path, extracted_text, status)
-        VALUES (?, ?, ?, ?, ?, ?, 'pending')
-      `).run(id, assignmentId || null, studentId, file.originalname, file.path, extractedText);
+      const submission = await prisma.submission.create({
+        data: {
+          fileName: file.originalname,
+          filePath: file.path,
+          extractedText,
+          status: 'pending',
+          assignmentId: assignmentId || null,
+          studentId
+        }
+      });
 
       submissions.push({
-        id,
+        id: submission.id,
         fileName: file.originalname,
         studentName,
         status: 'pending'
@@ -114,10 +135,8 @@ router.post('/upload', upload.array('files', 100), async (req, res) => {
 
 // Helper to extract student name from filename
 function extractStudentFromFilename(filename: string): string | null {
-  // Remove extension
   const nameWithoutExt = filename.replace(/\.[^/.]+$/, '');
 
-  // Common patterns: "LastName_FirstName_Assignment", "FirstName LastName", etc.
   const patterns = [
     /^([A-Za-z]+)_([A-Za-z]+)/,  // LastName_FirstName
     /^([A-Za-z]+)-([A-Za-z]+)/,  // LastName-FirstName
@@ -127,39 +146,38 @@ function extractStudentFromFilename(filename: string): string | null {
   for (const pattern of patterns) {
     const match = nameWithoutExt.match(pattern);
     if (match) {
-      return `${match[2]} ${match[1]}`; // Return as "FirstName LastName"
+      return `${match[2]} ${match[1]}`;
     }
   }
 
   return null;
 }
 
-// Get single submission with grades
-router.get('/:id', (req, res) => {
+// Get single submission with feedback
+router.get('/:id', async (req, res) => {
   try {
-    const submission = db.prepare(`
-      SELECT s.*, st.name as student_name
-      FROM submissions s
-      LEFT JOIN students st ON s.student_id = st.id
-      WHERE s.id = ?
-    `).get(req.params.id);
+    const submission = await prisma.submission.findUnique({
+      where: { id: req.params.id },
+      include: {
+        student: true,
+        inlineComments: {
+          include: { criterion: true }
+        },
+        sectionFeedback: {
+          include: { criterion: true }
+        },
+        overallFeedback: true
+      }
+    });
 
     if (!submission) {
       return res.status(404).json({ error: 'Submission not found' });
     }
 
-    const grades = db.prepare(`
-      SELECT g.*, c.name as criterion_name, c.max_points
-      FROM grades g
-      JOIN criteria c ON g.criterion_id = c.id
-      WHERE g.submission_id = ?
-    `).all(req.params.id);
-
-    const overallFeedback = db.prepare(`
-      SELECT * FROM overall_feedback WHERE submission_id = ?
-    `).get(req.params.id);
-
-    res.json({ ...submission, grades, overallFeedback });
+    res.json({
+      ...submission,
+      studentName: submission.student?.name
+    });
   } catch (error) {
     console.error('Error fetching submission:', error);
     res.status(500).json({ error: 'Failed to fetch submission' });
@@ -167,10 +185,13 @@ router.get('/:id', (req, res) => {
 });
 
 // Update submission status
-router.patch('/:id/status', (req, res) => {
+router.patch('/:id/status', async (req, res) => {
   try {
     const { status } = req.body;
-    db.prepare('UPDATE submissions SET status = ? WHERE id = ?').run(status, req.params.id);
+    await prisma.submission.update({
+      where: { id: req.params.id },
+      data: { status }
+    });
     res.json({ success: true });
   } catch (error) {
     console.error('Error updating submission:', error);
@@ -179,9 +200,11 @@ router.patch('/:id/status', (req, res) => {
 });
 
 // Delete submission
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    db.prepare('DELETE FROM submissions WHERE id = ?').run(req.params.id);
+    await prisma.submission.delete({
+      where: { id: req.params.id }
+    });
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting submission:', error);

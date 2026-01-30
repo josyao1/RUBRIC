@@ -35,10 +35,11 @@ app.get('/api/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`
   ╔═══════════════════════════════════════════╗
-  ║         RUBRIC Backend Server             ║
+  ║       GradeMate Backend Server            ║
   ╠═══════════════════════════════════════════╣
   ║  Local:   http://localhost:${PORT}           ║
   ║  Health:  http://localhost:${PORT}/api/health║
+  ║  Database: Prisma (SQLite/PostgreSQL)     ║
   ╚═══════════════════════════════════════════╝
   `);
 });
