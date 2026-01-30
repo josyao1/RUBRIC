@@ -1,0 +1,11 @@
+{
+  "name": "rubric",
+  "version": "1.0.0",
+  "description": "AI-Powered Grading Assistant for Educators",
+  "scripts": {
+    "frontend": "cd frontend && npm run dev",
+    "backend": "cd backend && npm run dev",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
+    "dev": "echo 'Run frontend and backend in separate terminals:\\n  npm run frontend\\n  npm run backend'"
+  }
+}
