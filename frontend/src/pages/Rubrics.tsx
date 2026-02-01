@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Plus, Upload, FileText, Trash2, GripVertical, Loader2, AlertCircle } from 'lucide-react';
-import { rubricsApi, type Rubric, type Criterion } from '../services/api';
+import { Plus, Upload, FileText, Trash2, GripVertical, Loader2, AlertCircle, Eye, Image } from 'lucide-react';
+import { rubricsApi, getFileUrl, type Rubric, type Criterion } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Rubrics() {
@@ -101,15 +101,11 @@ export default function Rubrics() {
         />
       )}
 
-      {/* View/Edit Modal */}
+      {/* View Modal */}
       {viewingRubric && (
         <ViewRubricModal
           rubric={viewingRubric}
           onClose={() => setViewingRubric(null)}
-          onUpdate={(updated) => {
-            setRubrics(rubrics.map(r => r.id === updated.id ? updated : r));
-            setViewingRubric(null);
-          }}
         />
       )}
 
@@ -161,8 +157,8 @@ export default function Rubrics() {
 }
 
 function RubricCard({ rubric, onDelete, onView }: { rubric: Rubric; onDelete: () => void; onView: () => void }) {
-  const totalPoints = rubric.criteria?.reduce((sum, c) => sum + (c.maxPoints || 0), 0) || 0;
   const hasCriteria = rubric.criteria && rubric.criteria.length > 0;
+  const hasLevels = rubric.criteria?.some(c => c.levels && c.levels.length > 0);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
@@ -174,7 +170,9 @@ function RubricCard({ rubric, onDelete, onView }: { rubric: Rubric; onDelete: ()
           <div className="ml-3">
             <h3 className="font-semibold text-gray-900">{rubric.name}</h3>
             <p className="text-sm text-gray-500">
-              {hasCriteria ? `${rubric.criteria.length} criteria` : 'Needs parsing'}
+              {hasCriteria
+                ? `${rubric.criteria.length} criteria${hasLevels ? ' with levels' : ''}`
+                : 'Processing...'}
             </p>
           </div>
         </div>
@@ -185,12 +183,13 @@ function RubricCard({ rubric, onDelete, onView }: { rubric: Rubric; onDelete: ()
       <p className="text-sm text-gray-600 mb-4 line-clamp-2">{rubric.description || 'No description'}</p>
       <div className="flex items-center justify-between text-sm">
         <span className="text-gray-500">
-          {hasCriteria ? `Total: ${totalPoints} points` : 'Text extracted'}
+          {hasCriteria ? 'Ready for feedback' : 'Awaiting AI'}
         </span>
         <button
           onClick={onView}
-          className="text-indigo-600 hover:text-indigo-700 font-medium"
+          className="flex items-center gap-1 text-indigo-600 hover:text-indigo-700 font-medium"
         >
+          <Eye className="w-4 h-4" />
           View
         </button>
       </div>
@@ -313,7 +312,7 @@ function UploadModal({ onClose, onUpload, userId }: {
             className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {uploading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {uploading ? 'Uploading...' : 'Upload & Parse'}
+            {uploading ? 'Processing with AI...' : 'Upload'}
           </button>
         </div>
       </div>
@@ -328,8 +327,13 @@ function BuilderModal({ onClose, onSave, userId }: {
 }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [criteria, setCriteria] = useState<Omit<Criterion, 'id'>[]>([
-    { name: '', description: '', maxPoints: 10, order: 0 }
+  const [criteria, setCriteria] = useState<Criterion[]>([
+    { name: '', description: '', levels: [
+      { label: 'Excellent', description: '' },
+      { label: 'Good', description: '' },
+      { label: 'Developing', description: '' },
+      { label: 'Beginning', description: '' }
+    ] }
   ]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -337,11 +341,16 @@ function BuilderModal({ onClose, onSave, userId }: {
   const addCriterion = () => {
     setCriteria([
       ...criteria,
-      { name: '', description: '', maxPoints: 10, order: criteria.length }
+      { name: '', description: '', levels: [
+        { label: 'Excellent', description: '' },
+        { label: 'Good', description: '' },
+        { label: 'Developing', description: '' },
+        { label: 'Beginning', description: '' }
+      ] }
     ]);
   };
 
-  const updateCriterion = (index: number, field: keyof Omit<Criterion, 'id'>, value: string | number) => {
+  const updateCriterion = (index: number, field: string, value: string) => {
     const updated = [...criteria];
     updated[index] = { ...updated[index], [field]: value };
     setCriteria(updated);
@@ -373,8 +382,6 @@ function BuilderModal({ onClose, onSave, userId }: {
       setSaving(false);
     }
   };
-
-  const totalPoints = criteria.reduce((sum, c) => sum + (c.maxPoints || 0), 0);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -417,34 +424,27 @@ function BuilderModal({ onClose, onSave, userId }: {
           {/* Criteria */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <label className="text-sm font-medium text-gray-700">Criteria</label>
-              <span className="text-sm text-gray-500">Total: {totalPoints} points</span>
+              <label className="text-sm font-medium text-gray-700">Feedback Criteria</label>
+              <span className="text-sm text-gray-500">{criteria.length} criteria</span>
             </div>
             <div className="space-y-3">
               {criteria.map((criterion, index) => (
                 <div key={index} className="flex gap-3 items-start p-4 bg-gray-50 rounded-lg">
                   <GripVertical className="w-5 h-5 text-gray-400 mt-2 cursor-grab" />
-                  <div className="flex-1 grid grid-cols-12 gap-3">
+                  <div className="flex-1 space-y-2">
                     <input
                       type="text"
                       value={criterion.name}
                       onChange={(e) => updateCriterion(index, 'name', e.target.value)}
-                      placeholder="Criterion name"
-                      className="col-span-4 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="Criterion name (e.g., Thesis Statement)"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                     />
-                    <input
-                      type="text"
+                    <textarea
                       value={criterion.description}
                       onChange={(e) => updateCriterion(index, 'description', e.target.value)}
-                      placeholder="Description"
-                      className="col-span-6 px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    />
-                    <input
-                      type="number"
-                      value={criterion.maxPoints}
-                      onChange={(e) => updateCriterion(index, 'maxPoints', parseInt(e.target.value) || 0)}
-                      placeholder="Points"
-                      className="col-span-2 px-3 py-2 border border-gray-300 rounded-lg text-sm text-center"
+                      placeholder="What this criterion evaluates..."
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                     />
                   </div>
                   <button
@@ -488,90 +488,123 @@ function BuilderModal({ onClose, onSave, userId }: {
   );
 }
 
-function ViewRubricModal({ rubric, onClose, onUpdate }: {
+function ViewRubricModal({ rubric, onClose }: {
   rubric: Rubric;
   onClose: () => void;
-  onUpdate: (rubric: Rubric) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<'criteria' | 'rawText'>('criteria');
+  const [activeTab, setActiveTab] = useState<'criteria' | 'source'>('criteria');
+  const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Editable state
   const [name, setName] = useState(rubric.name);
   const [description, setDescription] = useState(rubric.description || '');
-  const [criteria, setCriteria] = useState<Omit<Criterion, 'id'>[]>(
-    rubric.criteria?.length
-      ? rubric.criteria.map(c => ({ name: c.name, description: c.description || '', maxPoints: c.maxPoints, order: c.order }))
-      : [{ name: '', description: '', maxPoints: 10, order: 0 }]
-  );
-  const [saving, setSaving] = useState(false);
-  const [loadingFull, setLoadingFull] = useState(true);
-  const [rawContent, setRawContent] = useState<string>('');
+  const [criteria, setCriteria] = useState<Criterion[]>([]);
+  const [sourceFile, setSourceFile] = useState<string | undefined>();
 
-  // Fetch full rubric with rawContent
+  // Fetch full rubric with criteria and levels
   useEffect(() => {
     const fetchFull = async () => {
       try {
         const full = await rubricsApi.getById(rubric.id);
-        setRawContent((full as any).rawContent || '');
+        setName(full.name);
+        setDescription(full.description || '');
+        setCriteria(full.criteria || []);
+        setSourceFile(full.sourceFile);
       } catch (err) {
         console.error('Failed to fetch rubric details:', err);
       } finally {
-        setLoadingFull(false);
+        setLoading(false);
       }
     };
     fetchFull();
   }, [rubric.id]);
 
-  const addCriterion = () => {
-    setCriteria([...criteria, { name: '', description: '', maxPoints: 10, order: criteria.length }]);
-  };
+  const hasLevels = criteria.some(c => c.levels && c.levels.length > 0);
 
-  const updateCriterion = (index: number, field: string, value: string | number) => {
+  // Get all unique level labels across all criteria
+  const allLevelLabels = hasLevels
+    ? [...new Set(criteria.flatMap(c => c.levels?.map(l => l.label) || []))]
+    : [];
+
+  const updateCriterion = (index: number, field: string, value: string) => {
     const updated = [...criteria];
     updated[index] = { ...updated[index], [field]: value };
     setCriteria(updated);
   };
 
+  const updateLevel = (criterionIndex: number, levelIndex: number, field: string, value: string) => {
+    const updated = [...criteria];
+    const levels = [...(updated[criterionIndex].levels || [])];
+    levels[levelIndex] = { ...levels[levelIndex], [field]: value };
+    updated[criterionIndex] = { ...updated[criterionIndex], levels };
+    setCriteria(updated);
+  };
+
+  const addCriterion = () => {
+    const defaultLevels = allLevelLabels.length > 0
+      ? allLevelLabels.map(label => ({ label, description: '' }))
+      : [
+          { label: 'Excellent', description: '' },
+          { label: 'Good', description: '' },
+          { label: 'Developing', description: '' },
+          { label: 'Beginning', description: '' }
+        ];
+    setCriteria([...criteria, { name: '', description: '', levels: defaultLevels }]);
+  };
+
   const removeCriterion = (index: number) => {
-    if (criteria.length > 1) {
-      setCriteria(criteria.filter((_, i) => i !== index));
-    }
+    setCriteria(criteria.filter((_, i) => i !== index));
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const updated = await rubricsApi.update(rubric.id, {
-        name,
-        description,
-        criteria: criteria.filter(c => c.name.trim())
-      });
-      onUpdate(updated);
+      await rubricsApi.update(rubric.id, { name, description, criteria });
+      setIsEditing(false);
     } catch (err) {
-      console.error('Failed to update rubric:', err);
+      console.error('Failed to save rubric:', err);
     } finally {
       setSaving(false);
     }
   };
 
-  const totalPoints = criteria.reduce((sum, c) => sum + (c.maxPoints || 0), 0);
-
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-gray-200">
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="text-xl font-bold text-gray-900 bg-transparent border-none focus:outline-none focus:ring-0 w-full"
-          />
-          <input
-            type="text"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Add a description..."
-            className="text-gray-500 text-sm bg-transparent border-none focus:outline-none focus:ring-0 w-full mt-1"
-          />
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              {isEditing ? (
+                <>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="text-xl font-bold text-gray-900 w-full px-2 py-1 border border-gray-300 rounded"
+                    placeholder="Rubric name"
+                  />
+                  <input
+                    type="text"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="text-sm text-gray-500 w-full px-2 py-1 mt-2 border border-gray-300 rounded"
+                    placeholder="Description (optional)"
+                  />
+                </>
+              ) : (
+                <>
+                  <h2 className="text-xl font-bold text-gray-900">{name}</h2>
+                  <p className="text-gray-500 text-sm mt-1">{description || 'No description'}</p>
+                </>
+              )}
+            </div>
+            <div className="ml-4">
+              <span className="text-sm text-gray-500">{criteria.length} criteria</span>
+            </div>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -579,116 +612,263 @@ function ViewRubricModal({ rubric, onClose, onUpdate }: {
           <div className="flex gap-4">
             <button
               onClick={() => setActiveTab('criteria')}
-              className={`py-3 px-1 border-b-2 font-medium text-sm ${
+              className={`py-3 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
                 activeTab === 'criteria'
                   ? 'border-indigo-600 text-indigo-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              Criteria ({criteria.filter(c => c.name.trim()).length})
+              <FileText className="w-4 h-4" />
+              Rubric Table
             </button>
             <button
-              onClick={() => setActiveTab('rawText')}
-              className={`py-3 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'rawText'
+              onClick={() => setActiveTab('source')}
+              className={`py-3 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                activeTab === 'source'
                   ? 'border-indigo-600 text-indigo-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              Extracted Text
+              <Image className="w-4 h-4" />
+              Original Document
             </button>
           </div>
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-6">
-          {activeTab === 'criteria' ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+              <span className="ml-3 text-gray-600">Loading rubric...</span>
+            </div>
+          ) : activeTab === 'criteria' ? (
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-medium text-gray-700">Rubric Criteria</span>
-                <span className="text-sm text-gray-500">Total: {totalPoints} points</span>
-              </div>
-              <div className="space-y-3">
-                {criteria.map((criterion, index) => (
-                  <div key={index} className="flex gap-3 items-start p-4 bg-gray-50 rounded-lg">
-                    <div className="flex-1 grid grid-cols-12 gap-3">
-                      <input
-                        type="text"
-                        value={criterion.name}
-                        onChange={(e) => updateCriterion(index, 'name', e.target.value)}
-                        placeholder="Criterion name"
-                        className="col-span-4 px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      />
-                      <input
-                        type="text"
-                        value={criterion.description}
-                        onChange={(e) => updateCriterion(index, 'description', e.target.value)}
-                        placeholder="Description"
-                        className="col-span-6 px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      />
-                      <input
-                        type="number"
-                        value={criterion.maxPoints}
-                        onChange={(e) => updateCriterion(index, 'maxPoints', parseInt(e.target.value) || 0)}
-                        placeholder="Points"
-                        className="col-span-2 px-3 py-2 border border-gray-300 rounded-lg text-sm text-center"
-                      />
-                    </div>
-                    <button
-                      onClick={() => removeCriterion(index)}
-                      className="text-gray-400 hover:text-red-500 mt-2"
-                    >
-                      <Trash2 className="w-4 h-4" />
+              {criteria.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <FileText className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                  <p>No criteria yet.</p>
+                  {isEditing && (
+                    <button onClick={addCriterion} className="mt-4 text-indigo-600 hover:text-indigo-700">
+                      + Add Criterion
                     </button>
-                  </div>
-                ))}
-              </div>
-              <button
-                onClick={addCriterion}
-                className="mt-3 flex items-center text-sm text-indigo-600 hover:text-indigo-700"
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                Add Criterion
-              </button>
+                  )}
+                </div>
+              ) : hasLevels ? (
+                /* Table view with levels */
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="border border-gray-300 px-4 py-3 text-left font-semibold text-gray-700 w-48">
+                          Criteria
+                        </th>
+                        {allLevelLabels.map(label => (
+                          <th key={label} className="border border-gray-300 px-4 py-3 text-center font-semibold text-gray-700 min-w-[200px]">
+                            {label}
+                          </th>
+                        ))}
+                        {isEditing && <th className="border border-gray-300 px-2 py-3 w-10"></th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {criteria.map((criterion, idx) => (
+                        <tr key={criterion.id || idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="border border-gray-300 px-4 py-3 align-top">
+                            {isEditing ? (
+                              <>
+                                <input
+                                  type="text"
+                                  value={criterion.name}
+                                  onChange={(e) => updateCriterion(idx, 'name', e.target.value)}
+                                  className="font-medium text-gray-900 w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                  placeholder="Criterion name"
+                                />
+                                <textarea
+                                  value={criterion.description}
+                                  onChange={(e) => updateCriterion(idx, 'description', e.target.value)}
+                                  className="text-sm text-gray-500 w-full px-2 py-1 mt-2 border border-gray-300 rounded"
+                                  placeholder="Description"
+                                  rows={2}
+                                />
+                              </>
+                            ) : (
+                              <>
+                                <div className="font-medium text-gray-900">{criterion.name}</div>
+                                {criterion.description && (
+                                  <div className="text-sm text-gray-500 mt-1">{criterion.description}</div>
+                                )}
+                              </>
+                            )}
+                          </td>
+                          {allLevelLabels.map((label) => {
+                            const level = criterion.levels?.find(l => l.label === label);
+                            const actualLevelIdx = criterion.levels?.findIndex(l => l.label === label) ?? -1;
+                            return (
+                              <td key={label} className="border border-gray-300 px-4 py-3 align-top text-sm">
+                                {isEditing ? (
+                                  <textarea
+                                    value={level?.description || ''}
+                                    onChange={(e) => actualLevelIdx >= 0 && updateLevel(idx, actualLevelIdx, 'description', e.target.value)}
+                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                    placeholder={`Describe ${label} performance`}
+                                    rows={3}
+                                  />
+                                ) : level ? (
+                                  <div className="text-gray-700">{level.description}</div>
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                          {isEditing && (
+                            <td className="border border-gray-300 px-2 py-3 align-top">
+                              <button
+                                onClick={() => removeCriterion(idx)}
+                                className="text-gray-400 hover:text-red-500"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {isEditing && (
+                    <button
+                      onClick={addCriterion}
+                      className="mt-4 flex items-center text-sm text-indigo-600 hover:text-indigo-700"
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Criterion
+                    </button>
+                  )}
+                </div>
+              ) : (
+                /* Simple list view when no levels */
+                <div className="space-y-4">
+                  {criteria.map((criterion, idx) => (
+                    <div key={criterion.id || idx} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      {isEditing ? (
+                        <div className="flex gap-3">
+                          <div className="flex-1">
+                            <input
+                              type="text"
+                              value={criterion.name}
+                              onChange={(e) => updateCriterion(idx, 'name', e.target.value)}
+                              className="font-medium text-gray-900 w-full px-2 py-1 border border-gray-300 rounded"
+                              placeholder="Criterion name"
+                            />
+                            <textarea
+                              value={criterion.description}
+                              onChange={(e) => updateCriterion(idx, 'description', e.target.value)}
+                              className="text-sm w-full px-2 py-1 mt-2 border border-gray-300 rounded"
+                              placeholder="Description"
+                              rows={2}
+                            />
+                          </div>
+                          <button onClick={() => removeCriterion(idx)} className="text-gray-400 hover:text-red-500">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <h3 className="font-medium text-gray-900">{criterion.name}</h3>
+                          {criterion.description && (
+                            <p className="text-sm text-gray-600 mt-2">{criterion.description}</p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  ))}
+                  {isEditing && (
+                    <button
+                      onClick={addCriterion}
+                      className="flex items-center text-sm text-indigo-600 hover:text-indigo-700"
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Criterion
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
+            /* Source file preview */
             <div>
-              <p className="text-sm text-gray-500 mb-3">
-                This is the text extracted from the uploaded file. Use this to manually create criteria above,
-                or wait for AI parsing when available.
-              </p>
-              {loadingFull ? (
-                <div className="flex items-center gap-2 text-gray-500">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Loading...
+              {sourceFile ? (
+                <div className="flex flex-col items-center">
+                  <p className="text-sm text-gray-500 mb-4">Original uploaded document</p>
+                  {sourceFile.match(/\.(png|jpg|jpeg|webp)$/i) ? (
+                    <img
+                      src={getFileUrl(rubric.id)}
+                      alt="Rubric document"
+                      className="max-w-full max-h-[60vh] rounded-lg shadow-lg"
+                    />
+                  ) : sourceFile.match(/\.pdf$/i) ? (
+                    <iframe
+                      src={getFileUrl(rubric.id)}
+                      className="w-full h-[60vh] rounded-lg border border-gray-200"
+                      title="Rubric PDF"
+                    />
+                  ) : (
+                    <div className="text-center py-12 text-gray-500">
+                      <FileText className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                      <p>Document preview not available for this file type.</p>
+                    </div>
+                  )}
                 </div>
-              ) : rawContent ? (
-                <pre className="bg-gray-50 p-4 rounded-lg text-sm text-gray-700 whitespace-pre-wrap font-mono max-h-96 overflow-auto">
-                  {rawContent}
-                </pre>
               ) : (
-                <p className="text-gray-400 italic">No text extracted (rubric was created manually)</p>
+                <div className="text-center py-12 text-gray-500">
+                  <FileText className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                  <p>No source document (rubric was created manually)</p>
+                </div>
               )}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!name.trim() || saving}
-            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {saving ? 'Saving...' : 'Save Changes'}
-          </button>
+        <div className="p-6 border-t border-gray-200 flex justify-between">
+          <div>
+            {!isEditing && activeTab === 'criteria' && (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="px-4 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg"
+              >
+                Edit Rubric
+              </button>
+            )}
+          </div>
+          <div className="flex gap-3">
+            {isEditing ? (
+              <>
+                <button
+                  onClick={() => setIsEditing(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                Close
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

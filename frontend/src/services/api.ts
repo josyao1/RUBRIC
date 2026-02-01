@@ -59,12 +59,18 @@ async function uploadFile<T>(
 // RUBRICS API
 // ============================================================================
 
+export interface CriterionLevel {
+  id?: string;
+  label: string;      // e.g., "Excellent", "Good", "Developing", "Beginning"
+  description: string;
+}
+
 export interface Criterion {
-  id: string;
+  id?: string;
   name: string;
   description: string;
-  maxPoints: number;
-  order: number;
+  order?: number;
+  levels?: CriterionLevel[];
 }
 
 export interface Rubric {
@@ -72,10 +78,13 @@ export interface Rubric {
   name: string;
   description: string;
   criteria: Criterion[];
+  sourceFile?: string;
   rawContent?: string;
   createdAt: string;
   updatedAt: string;
 }
+
+export const getFileUrl = (rubricId: string) => `${API_BASE}/rubrics/${rubricId}/file`;
 
 export interface CreateRubricData {
   name: string;
@@ -114,6 +123,76 @@ export const rubricsApi = {
     fetchApi<{ success: boolean }>(`/rubrics/${id}`, {
       method: 'DELETE',
     }),
+
+  // Parse rubric with AI
+  parse: (id: string) =>
+    fetchApi<Rubric>(`/rubrics/${id}/parse`, {
+      method: 'POST',
+    }),
+};
+
+// ============================================================================
+// ASSIGNMENTS API
+// ============================================================================
+
+export interface Assignment {
+  id: string;
+  name: string;
+  dueDate?: string;
+  createdAt: string;
+  rubricId?: string;
+  rubricName?: string;
+  submissionCount: number;
+  gradingStatus: 'idle' | 'in_progress' | 'completed' | 'error';
+  gradingProgress: number;
+  gradingTotal: number;
+}
+
+export interface CreateAssignmentData {
+  name: string;
+  rubricId?: string;
+  dueDate?: string;
+}
+
+export interface GradingStatus {
+  gradingStatus: 'idle' | 'in_progress' | 'completed' | 'error';
+  gradingProgress: number;
+  gradingTotal: number;
+}
+
+export const assignmentsApi = {
+  getAll: () => fetchApi<Assignment[]>('/assignments'),
+
+  getById: (id: string) => fetchApi<Assignment>(`/assignments/${id}`),
+
+  create: (data: CreateAssignmentData) =>
+    fetchApi<Assignment>('/assignments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: Partial<CreateAssignmentData>) =>
+    fetchApi<Assignment>(`/assignments/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    fetchApi<{ success: boolean }>(`/assignments/${id}`, {
+      method: 'DELETE',
+    }),
+
+  startGrading: (id: string, teacherPreferences?: string) =>
+    fetchApi<{ success: boolean; message: string; totalSubmissions: number }>(
+      `/assignments/${id}/start-grading`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ teacherPreferences }),
+      }
+    ),
+
+  getGradingStatus: (id: string) =>
+    fetchApi<GradingStatus>(`/assignments/${id}/grading-status`),
 };
 
 // ============================================================================
@@ -131,12 +210,49 @@ export interface Submission {
   submittedAt: string;
 }
 
+export interface InlineComment {
+  id: string;
+  startPosition: number;
+  endPosition: number;
+  highlightedText: string;
+  comment: string;
+  criterion?: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface SectionFeedback {
+  id: string;
+  strengths: string; // JSON string array
+  areasForGrowth: string; // JSON string array
+  suggestions: string; // JSON string array
+  criterion: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface OverallFeedback {
+  id: string;
+  summary: string;
+  priorityImprovements: string; // JSON string array
+  encouragement?: string;
+  nextSteps: string; // JSON string array
+}
+
+export interface SubmissionWithFeedback extends Submission {
+  inlineComments: InlineComment[];
+  sectionFeedback: SectionFeedback[];
+  overallFeedback?: OverallFeedback;
+}
+
 export const submissionsApi = {
   // Get all submissions
   getAll: () => fetchApi<Submission[]>('/submissions'),
 
-  // Get single submission
-  getById: (id: string) => fetchApi<Submission>(`/submissions/${id}`),
+  // Get single submission with feedback
+  getById: (id: string) => fetchApi<SubmissionWithFeedback>(`/submissions/${id}`),
 
   // Upload submissions (multiple files)
   upload: async (files: File[], assignmentId?: string) => {

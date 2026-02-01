@@ -30,6 +30,7 @@ const upload = multer({
 
 // Get all submissions
 router.get('/', async (req, res) => {
+  console.log('[SUBMISSIONS] GET / - Fetching all submissions');
   try {
     const submissions = await prisma.submission.findMany({
       include: {
