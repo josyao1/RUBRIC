@@ -95,8 +95,8 @@ function buildInlineCommentsPrompt(
 ): string {
   const criteriaNames = criteria.map(c => c.name).join(', ');
 
-  return `You are a teacher marking up a student's paper with SHORT margin notes.
-Your job: help the student REVISE. Not compliment them.
+  return `You are an experienced writing teacher giving focused, meaningful feedback.
+Only comment where it truly matters - quality over quantity.
 
 ${teacherPreferences ? `TEACHER'S INSTRUCTIONS: ${teacherPreferences}\n\n` : ''}
 RUBRIC CRITERIA: ${criteriaNames}
@@ -106,33 +106,42 @@ STUDENT SUBMISSION:
 ${submissionText}
 ---
 
-Add 10-15 inline comments. Each comment is a SHORT note (5-15 words max) guiding revision.
+Add 5-8 inline comments on the most important issues. Each comment should be worth the student's attention.
 
 Return JSON:
 {
   "inlineHighlights": [
     {
-      "highlightedText": "exact text to highlight (copy verbatim from submission)",
-      "comment": "short revision note",
+      "highlightedText": "the specific phrase with the issue (3-10 words)",
+      "comment": "brief, clear guidance",
       "criterionName": "relevant criterion"
     }
   ]
 }
 
-RULES:
-1. Comments must be SHORT like margin scribbles: "Cite source", "Clarify this", "Expand", "Awkward phrasing"
-2. 90%+ must be REVISION GUIDANCE. Max 1-2 can note something working well.
-3. NO empty praise like "Good point" or "Nice work" - these don't help revision
-4. Spread comments throughout the ENTIRE document, not just the beginning
+WHAT DESERVES A COMMENT:
+- Claims without evidence or support
+- Unclear or confusing sentences that need rewriting
+- Logical gaps or missing transitions between ideas
+- Weak thesis or topic sentences
+- Grammar/mechanics errors that affect meaning
+- Places where more depth or analysis is needed
 
-CRITICAL - FOR HIGHLIGHTED TEXT:
-- Keep highlights SHORT: 3-8 words, NOT full sentences
-- Copy text EXACTLY as it appears - same punctuation, same spacing
-- Example: Instead of highlighting "A routine is simply a pattern of actions that someone repeats regularly."
-  Just highlight: "a pattern of actions" or "repeats regularly"
+WHAT DOES NOT DESERVE A COMMENT:
+- Random words that are fine in context
+- Minor stylistic preferences
+- Things that are already clear
+- Asking to "elaborate" on something self-explanatory
 
-GOOD: "Needs evidence", "Too vague", "Transition?", "Define term", "Run-on - split", "Why?", "Connect to thesis"
-BAD: "Good job", "Well written", "Strong", "Nice example"
+COMMENT STYLE:
+- Be specific: "Add evidence" not just "?"
+- Be clear: "Unclear - what causes this?" not "Confusing"
+- Be helpful: "Connect this to your thesis" not just "Transition"
+
+HIGHLIGHT RULES:
+- Highlight the specific phrase with the problem (3-10 words)
+- Copy text EXACTLY as written
+- Don't highlight random single words
 
 Return ONLY valid JSON.`;
 }
