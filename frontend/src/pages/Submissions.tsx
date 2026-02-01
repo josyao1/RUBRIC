@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Upload, FileText, User, CheckCircle, Clock, AlertCircle, Loader2, Trash2, BookOpen, ChevronDown, Eye } from 'lucide-react';
-import { submissionsApi, assignmentsApi, type Submission, type Assignment } from '../services/api';
+import { Upload, FileText, User, CheckCircle, Clock, AlertCircle, Loader2, Trash2, BookOpen, ChevronDown, Eye, UserPlus } from 'lucide-react';
+import { submissionsApi, assignmentsApi, studentsApi, type Submission, type Assignment, type Student } from '../services/api';
 import FeedbackViewer from '../components/FeedbackViewer';
 
 export default function Submissions() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [selectedAssignment, setSelectedAssignment] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,16 +27,32 @@ export default function Submissions() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [submissionsData, assignmentsData] = await Promise.all([
+      const [submissionsData, assignmentsData, studentsData] = await Promise.all([
         submissionsApi.getAll(),
-        assignmentsApi.getAll()
+        assignmentsApi.getAll(),
+        studentsApi.getAll()
       ]);
       setSubmissions(submissionsData);
       setAssignments(assignmentsData);
+      setStudents(studentsData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLinkStudent = async (submissionId: string, studentId: string) => {
+    try {
+      await studentsApi.linkSubmission(submissionId, studentId);
+      // Update local state
+      setSubmissions(submissions.map(s =>
+        s.id === submissionId
+          ? { ...s, studentId, studentName: students.find(st => st.id === studentId)?.name }
+          : s
+      ));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to link student');
     }
   };
 
@@ -319,12 +336,25 @@ export default function Submissions() {
                     {new Date(submission.submittedAt).toLocaleString()}
                   </p>
                 </div>
-                {submission.studentName && (
-                  <div className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-700">{submission.studentName}</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-1">
+                  {submission.studentId ? (
+                    <User className="w-4 h-4 text-green-500" />
+                  ) : (
+                    <UserPlus className="w-4 h-4 text-amber-500" />
+                  )}
+                  <select
+                    className={`text-sm border rounded px-2 py-1 bg-white ${
+                      submission.studentId ? 'border-gray-200' : 'border-amber-300'
+                    }`}
+                    value={submission.studentId || ''}
+                    onChange={(e) => handleLinkStudent(submission.id, e.target.value)}
+                  >
+                    <option value="">No student linked</option>
+                    {students.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
                 <div className="flex items-center gap-2">
                   {getStatusIcon(submission.status)}
                   <span className="text-sm text-gray-500">{getStatusLabel(submission.status)}</span>

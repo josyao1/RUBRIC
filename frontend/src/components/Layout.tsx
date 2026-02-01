@@ -5,7 +5,8 @@ import {
   Upload,
   Settings,
   BookOpen,
-  MessageSquare
+  MessageSquare,
+  Users
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -14,7 +15,7 @@ const navItems = [
   { to: '/rubrics', icon: FileText, label: 'Rubrics' },
   { to: '/assignments', icon: BookOpen, label: 'Assignments' },
   { to: '/submissions', icon: Upload, label: 'Submissions' },
-  { to: '/feedback', icon: MessageSquare, label: 'Feedback Review' },
+  { to: '/students', icon: Users, label: 'Students' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 

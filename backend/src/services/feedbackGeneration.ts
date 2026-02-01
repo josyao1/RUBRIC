@@ -237,6 +237,10 @@ async function generateInlineComments(
   if (parsed.inlineHighlights && Array.isArray(parsed.inlineHighlights)) {
     let savedCount = 0;
     let notFoundCount = 0;
+    let tooLongCount = 0;
+    const MAX_HIGHLIGHT_LENGTH = 150; // Max characters for a highlight
+    const MAX_HIGHLIGHT_PERCENT = 0.15; // Max 15% of document
+
     for (const highlight of parsed.inlineHighlights) {
       if (!highlight.highlightedText) continue;
 
@@ -244,6 +248,15 @@ async function generateInlineComments(
       if (!position) {
         notFoundCount++;
         console.log(`[FEEDBACK] Text not found: "${highlight.highlightedText?.substring(0, 40)}..."`);
+        continue;
+      }
+
+      // Check if highlight is too long
+      const highlightLength = position.end - position.start;
+      const docLength = submissionText.length;
+      if (highlightLength > MAX_HIGHLIGHT_LENGTH || highlightLength > docLength * MAX_HIGHLIGHT_PERCENT) {
+        tooLongCount++;
+        console.log(`[FEEDBACK] Highlight too long (${highlightLength} chars, ${Math.round(highlightLength/docLength*100)}% of doc), skipping`);
         continue;
       }
 
@@ -262,7 +275,7 @@ async function generateInlineComments(
       });
       savedCount++;
     }
-    console.log(`[FEEDBACK] Saved ${savedCount} inline comments (${notFoundCount} not found)`);
+    console.log(`[FEEDBACK] Saved ${savedCount} inline comments (${notFoundCount} not found, ${tooLongCount} too long)`);
   }
 }
 

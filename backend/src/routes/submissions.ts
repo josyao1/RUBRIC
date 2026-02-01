@@ -91,23 +91,7 @@ router.post('/upload', upload.array('files', 100), async (req, res) => {
         extractedText = '(Could not extract text)';
       }
 
-      // Try to extract student name from filename
-      const studentName = extractStudentFromFilename(file.originalname);
-
-      // Create or find student
-      let studentId = null;
-      if (studentName) {
-        let student = await prisma.student.findFirst({
-          where: { name: studentName }
-        });
-        if (!student) {
-          student = await prisma.student.create({
-            data: { name: studentName }
-          });
-        }
-        studentId = student.id;
-      }
-
+      // Don't auto-link students - let teachers do it manually
       const submission = await prisma.submission.create({
         data: {
           fileName: file.originalname,
@@ -115,14 +99,13 @@ router.post('/upload', upload.array('files', 100), async (req, res) => {
           extractedText,
           status: 'pending',
           assignmentId: assignmentId || null,
-          studentId
+          studentId: null
         }
       });
 
       submissions.push({
         id: submission.id,
         fileName: file.originalname,
-        studentName,
         status: 'pending'
       });
     }

@@ -208,6 +208,10 @@ export interface Submission {
   extractedText?: string;
   status: 'pending' | 'processing' | 'ready' | 'reviewed';
   submittedAt: string;
+  feedbackToken?: string;
+  feedbackReleased?: boolean;
+  feedbackViewedAt?: string;
+  assignment?: { id: string; name: string };
 }
 
 export interface InlineComment {
@@ -292,6 +296,71 @@ export const submissionsApi = {
     fetchApi<{ success: boolean }>(`/submissions/${id}`, {
       method: 'DELETE',
     }),
+};
+
+// ============================================================================
+// STUDENTS API
+// ============================================================================
+
+export interface Student {
+  id: string;
+  name: string;
+  email?: string;
+  studentId?: string;
+  createdAt: string;
+  submissions?: Submission[];
+}
+
+export interface ReleasedFeedback {
+  submissionId: string;
+  studentName: string;
+  studentEmail?: string;
+  feedbackUrl: string;
+  token: string;
+}
+
+export const studentsApi = {
+  getAll: () => fetchApi<Student[]>('/students'),
+
+  create: (data: { name: string; email?: string; studentId?: string }) =>
+    fetchApi<Student>('/students', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  import: (students: { name: string; email: string; studentId?: string }[]) =>
+    fetchApi<{ created: Student[]; skipped: any[] }>('/students/import', {
+      method: 'POST',
+      body: JSON.stringify({ students }),
+    }),
+
+  update: (id: string, data: { name?: string; email?: string; studentId?: string }) =>
+    fetchApi<Student>(`/students/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    fetchApi<{ success: boolean }>(`/students/${id}`, {
+      method: 'DELETE',
+    }),
+
+  linkSubmission: (submissionId: string, studentId: string) =>
+    fetchApi<Submission>('/students/link-submission', {
+      method: 'POST',
+      body: JSON.stringify({ submissionId, studentId }),
+    }),
+
+  releaseFeedback: (assignmentId: string, sendEmail: boolean = false) =>
+    fetchApi<{ released: ReleasedFeedback[]; errors: any[] }>('/students/release-feedback', {
+      method: 'POST',
+      body: JSON.stringify({ assignmentId, sendEmail }),
+    }),
+
+  getFeedback: (token: string) =>
+    fetchApi<SubmissionWithFeedback & { studentName?: string; assignmentName?: string }>(
+      `/students/feedback/${token}`
+    ),
 };
 
 // ============================================================================

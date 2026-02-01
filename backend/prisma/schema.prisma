@@ -95,10 +95,11 @@ model Assignment {
 }
 
 model Student {
-  id        String  @id @default(uuid())
+  id        String   @id @default(uuid())
   name      String
-  email     String?
-  studentId String? // External student ID
+  email     String?  // For sending feedback (required to release)
+  studentId String?  // External student ID (optional)
+  createdAt DateTime @default(now())
 
   submissions Submission[]
 }
@@ -110,6 +111,11 @@ model Submission {
   extractedText String?
   status        String   @default("pending") // pending, processing, ready, reviewed
   submittedAt   DateTime @default(now())
+
+  // Magic link for student access
+  feedbackToken    String?  @unique // Unique token for student to view feedback
+  feedbackReleased Boolean  @default(false) // Has feedback been released to student?
+  feedbackViewedAt DateTime? // When student first viewed feedback
 
   assignmentId String?
   assignment   Assignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)

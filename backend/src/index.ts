@@ -6,6 +6,7 @@ import { mkdirSync, existsSync } from 'fs';
 import rubricRoutes from './routes/rubrics.js';
 import assignmentRoutes from './routes/assignments.js';
 import submissionRoutes from './routes/submissions.js';
+import studentRoutes from './routes/students.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -37,6 +38,7 @@ app.use((req, res, next) => {
 app.use('/api/rubrics', rubricRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/submissions', submissionRoutes);
+app.use('/api/students', studentRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
