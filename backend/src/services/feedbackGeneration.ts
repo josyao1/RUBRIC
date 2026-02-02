@@ -3,9 +3,49 @@ import prisma from '../db/prisma.js';
 
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
-// Rate limiting: Gemini 2.5 Flash Lite = 30 RPM
-// 2 requests per submission, ~8 seconds between calls to stay safe
+// Rate limiting settings
 const DELAY_BETWEEN_CALLS_MS = 4000;
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY_MS = 25000; // Start with 25s for rate limit errors
+
+// Helper to call Gemini API with retry logic for rate limits
+async function callGeminiWithRetry(prompt: string, retryCount = 0): Promise<string> {
+  try {
+    const response = await genAI.models.generateContent({
+      model: 'gemini-2.5-flash-lite',
+      contents: prompt
+    });
+    return response.text || '';
+  } catch (error: any) {
+    // Check if it's a rate limit error (429)
+    if (error?.status === 429) {
+      // Check if this is a daily quota error (free tier)
+      const isDailyQuota = error?.message?.includes('free_tier') || error?.message?.includes('FreeTier');
+
+      if (isDailyQuota) {
+        console.error(`[FEEDBACK] Daily quota exceeded. Free tier allows only 20 requests/day (~10 submissions).`);
+        console.error(`[FEEDBACK] Consider upgrading to a paid Gemini API plan for more capacity.`);
+        throw new Error('Daily API quota exceeded. Free tier limit reached. Try again tomorrow or upgrade your Gemini API plan.');
+      }
+
+      if (retryCount < MAX_RETRIES) {
+        // Extract retry delay from error if available, otherwise use exponential backoff
+        let retryDelay = INITIAL_RETRY_DELAY_MS * Math.pow(2, retryCount);
+
+        // Try to parse retry delay from error message
+        const retryMatch = error?.message?.match(/retry in (\d+(?:\.\d+)?)/i);
+        if (retryMatch) {
+          retryDelay = Math.ceil(parseFloat(retryMatch[1]) * 1000) + 2000; // Add 2s buffer
+        }
+
+        console.log(`[FEEDBACK] Rate limited, waiting ${retryDelay/1000}s before retry ${retryCount + 1}/${MAX_RETRIES}`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return callGeminiWithRetry(prompt, retryCount + 1);
+      }
+    }
+    throw error;
+  }
+}
 
 interface RubricCriterion {
   id: string;
@@ -213,12 +253,7 @@ async function generateInlineComments(
 
   const prompt = buildInlineCommentsPrompt(submissionText, criteria, teacherPreferences);
 
-  const response = await genAI.models.generateContent({
-    model: 'gemini-2.5-flash-lite',
-    contents: prompt
-  });
-
-  const text = response.text || '';
+  const text = await callGeminiWithRetry(prompt);
   let jsonText = text;
   const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (jsonMatch) jsonText = jsonMatch[1];
@@ -289,12 +324,7 @@ async function generateSynthesizedFeedback(
 
   const prompt = buildSynthesizedFeedbackPrompt(submissionText, criteria, teacherPreferences);
 
-  const response = await genAI.models.generateContent({
-    model: 'gemini-2.5-flash-lite',
-    contents: prompt
-  });
-
-  const text = response.text || '';
+  const text = await callGeminiWithRetry(prompt);
   let jsonText = text;
   const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (jsonMatch) jsonText = jsonMatch[1];
@@ -412,10 +442,17 @@ export async function processAssignmentFeedback(
         data: { status: 'processing' }
       });
 
-      // Clear existing feedback
+      // Clear existing feedback and reset release status (so teacher must re-release)
       await prisma.inlineComment.deleteMany({ where: { submissionId: submission.id } });
       await prisma.sectionFeedback.deleteMany({ where: { submissionId: submission.id } });
       await prisma.overallFeedback.deleteMany({ where: { submissionId: submission.id } });
+
+      // Reset release status - teacher must explicitly re-release after regrade
+      // Keep the token so the same magic link works after re-release
+      await prisma.submission.update({
+        where: { id: submission.id },
+        data: { feedbackReleased: false, feedbackViewedAt: null }
+      });
 
       if (submission.extractedText) {
         // Call 1: Inline comments

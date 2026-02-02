@@ -148,6 +148,31 @@ export interface Assignment {
   gradingTotal: number;
 }
 
+export interface AssignmentSubmission {
+  id: string;
+  fileName: string;
+  status: 'pending' | 'processing' | 'ready' | 'reviewed';
+  submittedAt: string;
+  studentId?: string;
+  studentName?: string;
+  studentEmail?: string;
+  feedbackReleased?: boolean;
+  feedbackViewedAt?: string;
+}
+
+export interface AssignmentDetail extends Assignment {
+  submissions: AssignmentSubmission[];
+  rubric?: {
+    id: string;
+    name: string;
+    criteria: Array<{
+      id: string;
+      name: string;
+      description?: string;
+    }>;
+  };
+}
+
 export interface CreateAssignmentData {
   name: string;
   rubricId?: string;
@@ -163,7 +188,7 @@ export interface GradingStatus {
 export const assignmentsApi = {
   getAll: () => fetchApi<Assignment[]>('/assignments'),
 
-  getById: (id: string) => fetchApi<Assignment>(`/assignments/${id}`),
+  getById: (id: string) => fetchApi<AssignmentDetail>(`/assignments/${id}`),
 
   create: (data: CreateAssignmentData) =>
     fetchApi<Assignment>('/assignments', {

@@ -41,7 +41,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get single assignment with submissions
+// Get single assignment with submissions and student info
 router.get('/:id', async (req, res) => {
   console.log(`[ASSIGNMENTS] GET /${req.params.id}`);
   try {
@@ -57,6 +57,11 @@ router.get('/:id', async (req, res) => {
           }
         },
         submissions: {
+          include: {
+            student: {
+              select: { id: true, name: true, email: true }
+            }
+          },
           orderBy: { submittedAt: 'desc' }
         }
       }
@@ -66,7 +71,24 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Assignment not found' });
     }
 
-    res.json(assignment);
+    // Transform submissions to include student name
+    const transformed = {
+      ...assignment,
+      rubricName: assignment.rubric?.name || null,
+      submissions: assignment.submissions.map(s => ({
+        id: s.id,
+        fileName: s.fileName,
+        status: s.status,
+        submittedAt: s.submittedAt,
+        studentId: s.studentId,
+        studentName: s.student?.name || null,
+        studentEmail: s.student?.email || null,
+        feedbackReleased: s.feedbackReleased,
+        feedbackViewedAt: s.feedbackViewedAt
+      }))
+    };
+
+    res.json(transformed);
   } catch (error) {
     console.error('[ASSIGNMENTS] Error:', error);
     res.status(500).json({ error: 'Failed to fetch assignment' });

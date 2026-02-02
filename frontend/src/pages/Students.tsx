@@ -86,6 +86,24 @@ export default function Students() {
     return { total: subs.length, pending, processing, ready };
   };
 
+  // Get submissions that need re-release (regraded but not yet re-released)
+  const getNeedsRereleaseSubmissions = (student: Student) => {
+    return student.submissions?.filter(s =>
+      (s.status === 'ready' || s.status === 'reviewed') &&
+      !s.feedbackReleased &&
+      s.feedbackToken // Has a token from previous release
+    ) || [];
+  };
+
+  // Get submissions that are ready but never released
+  const getReadyNotReleasedSubmissions = (student: Student) => {
+    return student.submissions?.filter(s =>
+      (s.status === 'ready' || s.status === 'reviewed') &&
+      !s.feedbackReleased &&
+      !s.feedbackToken // Never had a token
+    ) || [];
+  };
+
   return (
     <div className="p-8">
       {/* Header */}
@@ -290,45 +308,69 @@ export default function Students() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {releasedSubs.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {releasedSubs.map(sub => (
-                            <div key={sub.id} className="flex items-center gap-1">
-                              <button
-                                onClick={() => copyMagicLink(sub.feedbackToken!)}
-                                className={`flex items-center gap-1 px-2 py-1 text-xs rounded-full transition-colors ${
-                                  copiedToken === sub.feedbackToken
-                                    ? 'bg-green-100 text-green-700'
-                                    : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
-                                }`}
-                                title={sub.assignment?.name || sub.fileName}
-                              >
-                                {copiedToken === sub.feedbackToken ? (
-                                  <><CheckCircle className="w-3 h-3" /> Copied</>
-                                ) : (
-                                  <><Copy className="w-3 h-3" /> {sub.assignment?.name || 'Link'}</>
-                                )}
-                              </button>
-                              <a
-                                href={`/feedback/${sub.feedbackToken}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-gray-400 hover:text-indigo-600"
-                                title="Open feedback"
-                              >
-                                <ExternalLink className="w-3.5 h-3.5" />
-                              </a>
-                              {sub.feedbackViewedAt && (
-                                <span className="text-green-500" title={`Viewed ${new Date(sub.feedbackViewedAt).toLocaleString()}`}>
-                                  <Eye className="w-3.5 h-3.5" />
-                                </span>
+                      <div className="flex flex-wrap gap-2">
+                        {/* Released submissions - show copy link */}
+                        {releasedSubs.map(sub => (
+                          <div key={sub.id} className="flex items-center gap-1">
+                            <button
+                              onClick={() => copyMagicLink(sub.feedbackToken!)}
+                              className={`flex items-center gap-1 px-2 py-1 text-xs rounded-full transition-colors ${
+                                copiedToken === sub.feedbackToken
+                                  ? 'bg-green-100 text-green-700'
+                                  : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                              }`}
+                              title={sub.assignment?.name || sub.fileName}
+                            >
+                              {copiedToken === sub.feedbackToken ? (
+                                <><CheckCircle className="w-3 h-3" /> Copied</>
+                              ) : (
+                                <><Copy className="w-3 h-3" /> {sub.assignment?.name || 'Link'}</>
                               )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-gray-400 text-sm italic">Not released</span>
-                      )}
+                            </button>
+                            <a
+                              href={`/feedback/${sub.feedbackToken}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-gray-400 hover:text-indigo-600"
+                              title="Open feedback"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                            {sub.feedbackViewedAt && (
+                              <span className="text-green-500" title={`Viewed ${new Date(sub.feedbackViewedAt).toLocaleString()}`}>
+                                <Eye className="w-3.5 h-3.5" />
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                        {/* Regraded submissions - needs re-release */}
+                        {getNeedsRereleaseSubmissions(student).map(sub => (
+                          <span
+                            key={sub.id}
+                            className="flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-amber-100 text-amber-700"
+                            title={`${sub.assignment?.name || sub.fileName} - Regraded, needs re-release`}
+                          >
+                            <AlertCircle className="w-3 h-3" />
+                            Re-release needed
+                          </span>
+                        ))}
+                        {/* Ready but never released */}
+                        {getReadyNotReleasedSubmissions(student).length > 0 && (
+                          <span className="text-xs text-gray-500">
+                            {getReadyNotReleasedSubmissions(student).length} ready to release
+                          </span>
+                        )}
+                        {/* No submissions or all pending */}
+                        {releasedSubs.length === 0 &&
+                         getNeedsRereleaseSubmissions(student).length === 0 &&
+                         getReadyNotReleasedSubmissions(student).length === 0 &&
+                         statusSummary.total > 0 && (
+                          <span className="text-gray-400 text-sm italic">Awaiting grading</span>
+                        )}
+                        {statusSummary.total === 0 && (
+                          <span className="text-gray-400 text-sm italic">—</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
