@@ -1,13 +1,9 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { fileURLToPath } from 'url';
-import { dirname, join, extname } from 'path';
-import { readFileSync } from 'fs';
-import { createRequire } from 'module';
+import { dirname, join } from 'path';
 import prisma from '../db/prisma.js';
-
-// Handle CommonJS modules in ESM
-const require = createRequire(import.meta.url);
+import { extractTextFromFile } from '../services/textExtraction.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -64,32 +60,7 @@ router.post('/upload', upload.array('files', 100), async (req, res) => {
     const submissions = [];
 
     for (const file of req.files) {
-      const ext = extname(file.originalname).toLowerCase();
-
-      // Extract text based on file type
-      let extractedText = '';
-      try {
-        if (['.txt', '.py', '.java', '.js', '.ts', '.cpp', '.c', '.html', '.css', '.md'].includes(ext)) {
-          extractedText = readFileSync(file.path, 'utf-8');
-        } else if (ext === '.pdf') {
-          const pdfParse = require('pdf-parse');
-          const pdfBuffer = readFileSync(file.path);
-          const pdfData = await pdfParse(pdfBuffer);
-          extractedText = pdfData.text;
-        } else if (ext === '.docx' || ext === '.doc') {
-          const mammoth = await import('mammoth');
-          const result = await mammoth.extractRawText({ path: file.path });
-          extractedText = result.value;
-        } else if (['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) {
-          // OCR for images (e.g., scanned handwritten work)
-          const Tesseract = await import('tesseract.js');
-          const { data: { text } } = await Tesseract.recognize(file.path, 'eng');
-          extractedText = text;
-        }
-      } catch (parseError) {
-        console.error('Error parsing file:', parseError);
-        extractedText = '(Could not extract text)';
-      }
+      const extractedText = await extractTextFromFile(file.path, file.originalname);
 
       // Don't auto-link students - let teachers do it manually
       const submission = await prisma.submission.create({

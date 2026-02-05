@@ -158,6 +158,8 @@ export interface AssignmentSubmission {
   studentEmail?: string;
   feedbackReleased?: boolean;
   feedbackViewedAt?: string;
+  feedbackToken?: string;
+  parentSubmissionId?: string | null;
 }
 
 export interface AssignmentDetail extends Assignment {
@@ -414,6 +416,30 @@ export const studentsApi = {
     fetchApi<SubmissionWithFeedback & { studentName?: string; assignmentName?: string }>(
       `/students/feedback/${token}`
     ),
+
+  chatAboutFeedback: (token: string, message: string, history: { role: string; content: string }[]) =>
+    fetchApi<{ response: string }>(`/students/feedback/${token}/chat`, {
+      method: 'POST',
+      body: JSON.stringify({ message, history }),
+    }),
+
+  resubmit: async (token: string, file: File) => {
+    const url = `${API_BASE}/students/feedback/${token}/resubmit`;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Upload failed' }));
+      throw new Error(error.error || 'Upload failed');
+    }
+
+    return response.json();
+  },
 };
 
 // ============================================================================

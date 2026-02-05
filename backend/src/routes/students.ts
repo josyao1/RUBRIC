@@ -1,6 +1,30 @@
 import { Router } from 'express';
 import { randomBytes } from 'crypto';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import multer from 'multer';
+import { GoogleGenAI } from '@google/genai';
 import prisma from '../db/prisma.js';
+import { extractTextFromFile } from '../services/textExtraction.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+
+// Multer config for student resubmissions
+const resubmitStorage = multer.diskStorage({
+  destination: join(__dirname, '../../uploads/submissions'),
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + '-' + file.originalname);
+  }
+});
+
+const resubmitUpload = multer({
+  storage: resubmitStorage,
+  limits: { fileSize: 50 * 1024 * 1024 }
+});
 
 const router = Router();
 
@@ -274,6 +298,242 @@ router.get('/feedback/:token', async (req, res) => {
   } catch (error) {
     console.error('[STUDENTS] Error:', error);
     res.status(500).json({ error: 'Failed to fetch feedback' });
+  }
+});
+
+// Chat with AI about feedback (public - for students)
+router.post('/feedback/:token/chat', async (req, res) => {
+  console.log(`[STUDENTS] POST /feedback/${req.params.token}/chat`);
+  try {
+    const { message, history = [] } = req.body;
+
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(503).json({ error: 'AI chat is not configured' });
+    }
+
+    // Load submission with all feedback + rubric context
+    const submission = await prisma.submission.findFirst({
+      where: {
+        feedbackToken: req.params.token,
+        feedbackReleased: true
+      },
+      include: {
+        student: { select: { name: true } },
+        assignment: {
+          select: {
+            name: true,
+            rubric: {
+              include: {
+                criteria: {
+                  include: { levels: { orderBy: { sortOrder: 'asc' } } },
+                  orderBy: { sortOrder: 'asc' }
+                }
+              }
+            }
+          }
+        },
+        inlineComments: {
+          include: { criterion: { select: { name: true } } }
+        },
+        sectionFeedback: {
+          include: { criterion: { select: { name: true } } }
+        },
+        overallFeedback: true
+      }
+    });
+
+    if (!submission) {
+      return res.status(404).json({ error: 'Feedback not found or not yet released' });
+    }
+
+    // Build system prompt with full context
+    const studentName = submission.student?.name || 'Student';
+    const assignmentName = submission.assignment?.name || 'Assignment';
+
+    let systemPrompt = `You are a helpful, encouraging tutor for a student named ${studentName} who is reviewing feedback on their assignment "${assignmentName}".
+
+Your role:
+- Help the student UNDERSTAND the feedback they received
+- Explain WHY certain feedback was given by referencing the rubric criteria
+- Suggest SPECIFIC, ACTIONABLE steps the student can take to improve
+- Be encouraging but honest - do not sugarcoat issues
+- If the student asks about something not related to their assignment or feedback, gently redirect them
+- Keep responses concise (2-4 paragraphs max)
+`;
+
+    // Add rubric criteria
+    const rubric = submission.assignment?.rubric;
+    if (rubric && rubric.criteria.length > 0) {
+      systemPrompt += '\n=== RUBRIC CRITERIA ===\n';
+      for (const criterion of rubric.criteria) {
+        systemPrompt += `**${criterion.name}**`;
+        if (criterion.description) systemPrompt += `: ${criterion.description}`;
+        systemPrompt += '\n';
+        if (criterion.levels.length > 0) {
+          systemPrompt += '  Levels:\n';
+          for (const level of criterion.levels) {
+            systemPrompt += `  - ${level.label}: ${level.description}\n`;
+          }
+        }
+      }
+    }
+
+    // Add student's submission text (truncated)
+    if (submission.extractedText) {
+      const maxTextLength = 6000;
+      const text = submission.extractedText.length > maxTextLength
+        ? submission.extractedText.substring(0, maxTextLength) + '\n(truncated for length)'
+        : submission.extractedText;
+      systemPrompt += `\n=== STUDENT'S SUBMISSION ===\n${text}\n`;
+    }
+
+    // Add inline comments
+    if (submission.inlineComments.length > 0) {
+      systemPrompt += '\n=== INLINE COMMENTS ON SUBMISSION ===\n';
+      for (const comment of submission.inlineComments) {
+        const criterionName = comment.criterion?.name || 'General';
+        systemPrompt += `- [${criterionName}] On text "${comment.highlightedText}": ${comment.comment}\n`;
+      }
+    }
+
+    // Add section feedback
+    if (submission.sectionFeedback.length > 0) {
+      systemPrompt += '\n=== FEEDBACK BY CRITERIA ===\n';
+      for (const section of submission.sectionFeedback) {
+        systemPrompt += `**${section.criterion?.name}**:\n`;
+        try {
+          const strengths = JSON.parse(section.strengths);
+          if (strengths.length > 0) systemPrompt += `  Strengths: ${strengths.join('; ')}\n`;
+        } catch { /* skip */ }
+        try {
+          const growth = JSON.parse(section.areasForGrowth);
+          if (growth.length > 0) systemPrompt += `  Areas for Growth: ${growth.join('; ')}\n`;
+        } catch { /* skip */ }
+        try {
+          const suggestions = JSON.parse(section.suggestions);
+          if (suggestions.length > 0) systemPrompt += `  Suggestions: ${suggestions.join('; ')}\n`;
+        } catch { /* skip */ }
+      }
+    }
+
+    // Add overall feedback
+    if (submission.overallFeedback) {
+      systemPrompt += '\n=== OVERALL FEEDBACK ===\n';
+      systemPrompt += `Summary: ${submission.overallFeedback.summary}\n`;
+      if (submission.overallFeedback.encouragement) {
+        systemPrompt += `Encouragement: ${submission.overallFeedback.encouragement}\n`;
+      }
+      try {
+        const improvements = JSON.parse(submission.overallFeedback.priorityImprovements);
+        if (improvements.length > 0) systemPrompt += `Priority Improvements: ${improvements.join('; ')}\n`;
+      } catch { /* skip */ }
+      try {
+        const nextSteps = JSON.parse(submission.overallFeedback.nextSteps);
+        if (nextSteps.length > 0) systemPrompt += `Next Steps: ${nextSteps.join('; ')}\n`;
+      } catch { /* skip */ }
+    }
+
+    // Build contents array from conversation history (cap at last 20 messages)
+    const recentHistory = Array.isArray(history) ? history.slice(-20) : [];
+    const contents = [
+      ...recentHistory.map((msg: { role: string; content: string }) => ({
+        role: msg.role === 'assistant' ? ('model' as const) : ('user' as const),
+        parts: [{ text: msg.content }]
+      })),
+      {
+        role: 'user' as const,
+        parts: [{ text: message.trim() }]
+      }
+    ];
+
+    // Call Gemini
+    const response = await genAI.models.generateContent({
+      model: 'gemini-2.5-flash-lite',
+      contents,
+      config: {
+        systemInstruction: systemPrompt
+      }
+    });
+
+    const responseText = response.text || 'I apologize, but I was unable to generate a response. Please try again.';
+
+    res.json({ response: responseText });
+  } catch (error: any) {
+    console.error('[STUDENTS] Chat error:', error);
+
+    if (error?.status === 429) {
+      const isDailyQuota = error?.message?.includes('free_tier') || error?.message?.includes('FreeTier');
+      if (isDailyQuota) {
+        return res.status(429).json({ error: 'The AI assistant is temporarily unavailable due to daily usage limits. Please try again tomorrow.' });
+      }
+      return res.status(429).json({ error: 'Too many requests. Please wait a moment and try again.' });
+    }
+
+    res.status(500).json({ error: 'Failed to generate response' });
+  }
+});
+
+// Resubmit a revision (public - for students)
+router.post('/feedback/:token/resubmit', resubmitUpload.single('file'), async (req, res) => {
+  console.log(`[STUDENTS] POST /feedback/${req.params.token}/resubmit`);
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    // Find original submission by token
+    const original = await prisma.submission.findFirst({
+      where: {
+        feedbackToken: req.params.token,
+        feedbackReleased: true
+      },
+      select: {
+        id: true,
+        studentId: true,
+        assignmentId: true,
+        student: { select: { name: true } },
+        assignment: { select: { name: true } }
+      }
+    });
+
+    if (!original) {
+      return res.status(404).json({ error: 'Feedback not found or not yet released' });
+    }
+
+    if (!original.assignmentId) {
+      return res.status(400).json({ error: 'Original submission is not linked to an assignment' });
+    }
+
+    // Extract text from uploaded file
+    const extractedText = await extractTextFromFile(req.file.path, req.file.originalname);
+
+    // Create new submission linked to same student + assignment + parent
+    const newSubmission = await prisma.submission.create({
+      data: {
+        fileName: req.file.originalname,
+        filePath: req.file.path,
+        extractedText,
+        status: 'pending',
+        assignmentId: original.assignmentId,
+        studentId: original.studentId,
+        parentSubmissionId: original.id
+      }
+    });
+
+    console.log(`[STUDENTS] Resubmission created: ${newSubmission.id} for student ${original.student?.name}`);
+
+    res.json({
+      success: true,
+      message: 'Your revision has been submitted. Your instructor will review it and provide updated feedback.',
+      submissionId: newSubmission.id
+    });
+  } catch (error) {
+    console.error('[STUDENTS] Resubmit error:', error);
+    res.status(500).json({ error: 'Failed to submit revision' });
   }
 });
 
