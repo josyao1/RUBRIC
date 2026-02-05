@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Plus, BookOpen, Calendar, FileText, Trash2, Loader2, AlertCircle,
   Play, CheckCircle, XCircle, X, User, Clock, Eye, Edit3, Save,
-  Upload, Send, UserPlus, RefreshCw
+  Upload, Send, UserPlus, RefreshCw, Copy, ExternalLink
 } from 'lucide-react';
 import {
   assignmentsApi, rubricsApi, studentsApi, submissionsApi,
@@ -504,6 +504,304 @@ function StartGradingModal({ assignment, onClose, onStart }: {
   );
 }
 
+// Helper component to group submissions by student
+function SubmissionsGroupedByStudent({
+  submissions,
+  students,
+  selectedIds,
+  copiedToken,
+  toggleSelect,
+  toggleSelectAll,
+  handleLinkStudent,
+  handleDeleteSubmission,
+  copyMagicLink,
+  setViewingSubmissionId,
+  getStatusIcon,
+  getStatusLabel,
+}: {
+  submissions: import('../services/api').AssignmentSubmission[];
+  students: Student[];
+  selectedIds: Set<string>;
+  copiedToken: string | null;
+  toggleSelect: (id: string) => void;
+  toggleSelectAll: () => void;
+  handleLinkStudent: (submissionId: string, studentId: string) => void;
+  handleDeleteSubmission: (id: string) => void;
+  copyMagicLink: (token: string) => void;
+  setViewingSubmissionId: (id: string) => void;
+  getStatusIcon: (status: string) => React.ReactNode;
+  getStatusLabel: (status: string) => string;
+}) {
+  // Group submissions by student
+  // Build a map: studentId (or 'unassigned') -> submissions with version numbers
+
+  // First, identify root submissions (no parent) and their revision chains
+  const rootSubmissions = submissions.filter(s => !s.parentSubmissionId);
+  const revisionMap = new Map<string, typeof submissions>(); // parentId -> revisions
+
+  for (const sub of submissions) {
+    if (sub.parentSubmissionId) {
+      const revisions = revisionMap.get(sub.parentSubmissionId) || [];
+      revisions.push(sub);
+      revisionMap.set(sub.parentSubmissionId, revisions);
+    }
+  }
+
+  // Build revision chains (recursive)
+  function getVersionChain(rootId: string): typeof submissions {
+    const chain: typeof submissions = [];
+    const directRevisions = revisionMap.get(rootId) || [];
+    // Sort revisions by submittedAt
+    directRevisions.sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime());
+    for (const rev of directRevisions) {
+      chain.push(rev);
+      chain.push(...getVersionChain(rev.id));
+    }
+    return chain;
+  }
+
+  // Group by student
+  interface StudentGroup {
+    studentId: string | null;
+    studentName: string | null;
+    submissions: Array<typeof submissions[0] & { version: number }>;
+  }
+
+  const groupsMap = new Map<string, StudentGroup>();
+
+  for (const root of rootSubmissions) {
+    const key = root.studentId || 'unassigned';
+    if (!groupsMap.has(key)) {
+      groupsMap.set(key, {
+        studentId: root.studentId || null,
+        studentName: root.studentName || null,
+        submissions: []
+      });
+    }
+    const group = groupsMap.get(key)!;
+
+    // Add root as v1
+    group.submissions.push({ ...root, version: 1 });
+
+    // Add revisions as v2, v3, etc.
+    const revisions = getVersionChain(root.id);
+    revisions.forEach((rev, idx) => {
+      group.submissions.push({ ...rev, version: idx + 2 });
+    });
+  }
+
+  // Convert to array, sort: assigned students first (alphabetically), then unassigned
+  const groups = Array.from(groupsMap.values()).sort((a, b) => {
+    if (!a.studentId && b.studentId) return 1;
+    if (a.studentId && !b.studentId) return -1;
+    return (a.studentName || '').localeCompare(b.studentName || '');
+  });
+
+  // Helper to render a single submission row
+  const renderSubmissionRow = (
+    sub: typeof submissions[0] & { version: number },
+    isRevision: boolean
+  ) => (
+    <div
+      key={sub.id}
+      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors ${
+        selectedIds.has(sub.id) ? 'bg-indigo-50/50' : ''
+      } ${isRevision ? 'ml-6 border-l-2 border-gray-200' : ''}`}
+    >
+      <input
+        type="checkbox"
+        checked={selectedIds.has(sub.id)}
+        onChange={() => toggleSelect(sub.id)}
+        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+      />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+            isRevision ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
+          }`}>
+            v{sub.version}
+          </span>
+          <p className="text-sm font-medium text-gray-900 truncate">{sub.fileName}</p>
+        </div>
+        <p className="text-xs text-gray-400">
+          {new Date(sub.submittedAt).toLocaleString()}
+          {isRevision && <span className="ml-1 text-amber-600">(Revision)</span>}
+        </p>
+      </div>
+      <div className="w-24 flex items-center justify-center gap-1.5">
+        {getStatusIcon(sub.status)}
+        <span className="text-xs text-gray-600">{getStatusLabel(sub.status)}</span>
+      </div>
+      <div className="w-36 flex items-center justify-end gap-1">
+        {sub.feedbackReleased && sub.feedbackToken && (
+          <>
+            <button
+              onClick={() => copyMagicLink(sub.feedbackToken!)}
+              className={`p-1 rounded text-xs flex items-center gap-0.5 ${
+                copiedToken === sub.feedbackToken
+                  ? 'text-green-600 bg-green-50'
+                  : 'text-purple-600 hover:bg-purple-50'
+              }`}
+              title="Copy student link"
+            >
+              {copiedToken === sub.feedbackToken ? (
+                <><CheckCircle className="w-3 h-3" /> Copied</>
+              ) : (
+                <><Copy className="w-3 h-3" /> Link</>
+              )}
+            </button>
+            <a
+              href={`/feedback/${sub.feedbackToken}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1 text-purple-600 hover:bg-purple-50 rounded"
+              title="Open student view"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </>
+        )}
+        {sub.feedbackReleased && !sub.feedbackToken && (
+          <span className={`text-xs px-1.5 py-0.5 rounded ${
+            sub.feedbackViewedAt
+              ? 'bg-green-100 text-green-700'
+              : 'bg-purple-100 text-purple-700'
+          }`}>
+            {sub.feedbackViewedAt ? 'Viewed' : 'Released'}
+          </span>
+        )}
+        {(sub.status === 'ready' || sub.status === 'reviewed') && (
+          <button
+            onClick={() => setViewingSubmissionId(sub.id)}
+            className="p-1 text-indigo-600 hover:bg-indigo-50 rounded"
+            title="View feedback"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+        )}
+        <button
+          onClick={() => handleDeleteSubmission(sub.id)}
+          className="p-1 text-gray-400 hover:text-red-500 rounded"
+          title="Delete submission"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Select all header */}
+      <div className="flex items-center gap-3 px-3 py-2 text-xs text-gray-500 border-b border-gray-100 mb-1">
+        <input
+          type="checkbox"
+          checked={selectedIds.size === submissions.length && submissions.length > 0}
+          onChange={toggleSelectAll}
+          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+        />
+        <span className="flex-1">Submissions (grouped by student)</span>
+        <span className="w-24 text-center">Status</span>
+        <span className="w-36"></span>
+      </div>
+
+      <div className="space-y-4">
+        {groups.map((group) => (
+          <div key={group.studentId || 'unassigned'} className="border border-gray-200 rounded-lg overflow-hidden">
+            {/* Student header */}
+            <div className={`px-3 py-2 flex items-center gap-2 ${
+              group.studentId ? 'bg-green-50' : 'bg-amber-50'
+            }`}>
+              {group.studentId ? (
+                <User className="w-4 h-4 text-green-600" />
+              ) : (
+                <UserPlus className="w-4 h-4 text-amber-600" />
+              )}
+              <span className={`font-medium text-sm ${
+                group.studentId ? 'text-green-800' : 'text-amber-800'
+              }`}>
+                {group.studentName || 'Unassigned Submissions'}
+              </span>
+              <span className="text-xs text-gray-500">
+                ({group.submissions.length} submission{group.submissions.length !== 1 ? 's' : ''})
+              </span>
+              {!group.studentId && (
+                <span className="text-xs text-amber-600 ml-auto">Link students below</span>
+              )}
+            </div>
+
+            {/* Submissions for this student */}
+            <div className="divide-y divide-gray-100">
+              {group.submissions.map((sub) => (
+                <div key={sub.id}>
+                  {/* For unassigned, show student selector */}
+                  {!group.studentId ? (
+                    <div className={`flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 ${
+                      selectedIds.has(sub.id) ? 'bg-indigo-50/50' : ''
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(sub.id)}
+                        onChange={() => toggleSelect(sub.id)}
+                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                            v{sub.version}
+                          </span>
+                          <p className="text-sm font-medium text-gray-900 truncate">{sub.fileName}</p>
+                        </div>
+                        <p className="text-xs text-gray-400">{new Date(sub.submittedAt).toLocaleString()}</p>
+                      </div>
+                      <div className="w-40">
+                        <select
+                          className="text-xs border border-amber-300 rounded px-1.5 py-1 bg-white w-full"
+                          value=""
+                          onChange={(e) => handleLinkStudent(sub.id, e.target.value)}
+                        >
+                          <option value="">Link to student...</option>
+                          {students.map(s => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="w-24 flex items-center justify-center gap-1.5">
+                        {getStatusIcon(sub.status)}
+                        <span className="text-xs text-gray-600">{getStatusLabel(sub.status)}</span>
+                      </div>
+                      <div className="w-28 flex items-center justify-end gap-1">
+                        {(sub.status === 'ready' || sub.status === 'reviewed') && (
+                          <button
+                            onClick={() => setViewingSubmissionId(sub.id)}
+                            className="p-1 text-indigo-600 hover:bg-indigo-50 rounded"
+                            title="View feedback"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDeleteSubmission(sub.id)}
+                          className="p-1 text-gray-400 hover:text-red-500 rounded"
+                          title="Delete submission"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    renderSubmissionRow(sub, sub.version > 1)
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AssignmentDetailModal({ assignmentId, onClose, onUpdate, onStartGrading }: {
   assignmentId: string;
   onClose: () => void;
@@ -537,6 +835,9 @@ function AssignmentDetailModal({ assignmentId, onClose, onUpdate, onStartGrading
   // Release
   const [releasing, setReleasing] = useState(false);
   const [releaseResult, setReleaseResult] = useState<string | null>(null);
+
+  // Copy link
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
   // Polling for grading progress
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -671,6 +972,13 @@ function AssignmentDetailModal({ assignmentId, onClose, onUpdate, onStartGrading
     } finally {
       setReleasing(false);
     }
+  };
+
+  const copyMagicLink = (token: string) => {
+    const url = `${window.location.origin}/feedback/${token}`;
+    navigator.clipboard.writeText(url);
+    setCopiedToken(token);
+    setTimeout(() => setCopiedToken(null), 2000);
   };
 
   // Upload handlers
@@ -1016,96 +1324,20 @@ function AssignmentDetailModal({ assignmentId, onClose, onUpdate, onStartGrading
                   </button>
                 </div>
               ) : (
-                <div>
-                  {/* Select all header */}
-                  <div className="flex items-center gap-3 px-3 py-2 text-xs text-gray-500 border-b border-gray-100 mb-1">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.size === assignment.submissions.length && assignment.submissions.length > 0}
-                      onChange={toggleSelectAll}
-                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <span className="flex-1">File</span>
-                    <span className="w-40">Student</span>
-                    <span className="w-24 text-center">Status</span>
-                    <span className="w-28"></span>
-                  </div>
-                  <div className="space-y-1">
-                    {assignment.submissions.map((sub) => (
-                      <div
-                        key={sub.id}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors ${
-                          selectedIds.has(sub.id) ? 'bg-indigo-50/50' : ''
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(sub.id)}
-                          onChange={() => toggleSelect(sub.id)}
-                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{sub.fileName}</p>
-                          <p className="text-xs text-gray-400">
-                            {new Date(sub.submittedAt).toLocaleString()}
-                          </p>
-                        </div>
-                        <div className="w-40">
-                          <div className="flex items-center gap-1">
-                            {sub.studentId ? (
-                              <User className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-                            ) : (
-                              <UserPlus className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                            )}
-                            <select
-                              className={`text-xs border rounded px-1.5 py-1 bg-white w-full ${
-                                sub.studentId ? 'border-gray-200' : 'border-amber-300'
-                              }`}
-                              value={sub.studentId || ''}
-                              onChange={(e) => handleLinkStudent(sub.id, e.target.value)}
-                            >
-                              <option value="">No student</option>
-                              {students.map(s => (
-                                <option key={s.id} value={s.id}>{s.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                        <div className="w-24 flex items-center justify-center gap-1.5">
-                          {getStatusIcon(sub.status)}
-                          <span className="text-xs text-gray-600">{getStatusLabel(sub.status)}</span>
-                        </div>
-                        <div className="w-28 flex items-center justify-end gap-1">
-                          {sub.feedbackReleased && (
-                            <span className={`text-xs px-1.5 py-0.5 rounded ${
-                              sub.feedbackViewedAt
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-purple-100 text-purple-700'
-                            }`}>
-                              {sub.feedbackViewedAt ? 'Viewed' : 'Released'}
-                            </span>
-                          )}
-                          {(sub.status === 'ready' || sub.status === 'reviewed') && (
-                            <button
-                              onClick={() => setViewingSubmissionId(sub.id)}
-                              className="p-1 text-indigo-600 hover:bg-indigo-50 rounded"
-                              title="View feedback"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDeleteSubmission(sub.id)}
-                            className="p-1 text-gray-400 hover:text-red-500 rounded"
-                            title="Delete submission"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <SubmissionsGroupedByStudent
+                  submissions={assignment.submissions}
+                  students={students}
+                  selectedIds={selectedIds}
+                  copiedToken={copiedToken}
+                  toggleSelect={toggleSelect}
+                  toggleSelectAll={toggleSelectAll}
+                  handleLinkStudent={handleLinkStudent}
+                  handleDeleteSubmission={handleDeleteSubmission}
+                  copyMagicLink={copyMagicLink}
+                  setViewingSubmissionId={setViewingSubmissionId}
+                  getStatusIcon={getStatusIcon}
+                  getStatusLabel={getStatusLabel}
+                />
               )}
             </div>
           )}

@@ -84,7 +84,9 @@ router.get('/:id', async (req, res) => {
         studentName: s.student?.name || null,
         studentEmail: s.student?.email || null,
         feedbackReleased: s.feedbackReleased,
-        feedbackViewedAt: s.feedbackViewedAt
+        feedbackViewedAt: s.feedbackViewedAt,
+        feedbackToken: s.feedbackToken,
+        parentSubmissionId: s.parentSubmissionId || null
       }))
     };
 
