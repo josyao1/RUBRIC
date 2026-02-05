@@ -242,6 +242,62 @@ router.post('/:id/start-grading', async (req, res) => {
   }
 });
 
+// Regrade selected submissions
+router.post('/:id/regrade-selected', async (req, res) => {
+  console.log(`[ASSIGNMENTS] POST /${req.params.id}/regrade-selected`);
+  try {
+    const { submissionIds, teacherPreferences } = req.body;
+
+    if (!Array.isArray(submissionIds) || submissionIds.length === 0) {
+      return res.status(400).json({ error: 'No submissions selected for regrading.' });
+    }
+
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: req.params.id },
+      include: {
+        rubric: true,
+        submissions: { select: { id: true } }
+      }
+    });
+
+    if (!assignment) {
+      return res.status(404).json({ error: 'Assignment not found' });
+    }
+
+    if (!assignment.rubric) {
+      return res.status(400).json({ error: 'Assignment has no rubric linked.' });
+    }
+
+    if (assignment.gradingStatus === 'in_progress') {
+      return res.status(400).json({ error: 'Grading is already in progress.' });
+    }
+
+    // Validate all IDs belong to this assignment
+    const assignmentSubIds = new Set(assignment.submissions.map(s => s.id));
+    const invalidIds = submissionIds.filter((id: string) => !assignmentSubIds.has(id));
+    if (invalidIds.length > 0) {
+      return res.status(400).json({ error: 'Some submission IDs do not belong to this assignment.' });
+    }
+
+    processAssignmentFeedback(req.params.id, teacherPreferences, submissionIds).catch(error => {
+      console.error('[GRADING] Background selective regrade error:', error);
+      prisma.assignment.update({
+        where: { id: req.params.id },
+        data: { gradingStatus: 'error' }
+      }).catch(console.error);
+    });
+
+    res.json({
+      success: true,
+      message: 'Selective regrade started',
+      totalSubmissions: submissionIds.length
+    });
+  } catch (error) {
+    console.error('[ASSIGNMENTS] Error:', error);
+    res.status(500).json({ error: 'Failed to start selective regrade' });
+  }
+});
+
 // Get grading status for an assignment
 router.get('/:id/grading-status', async (req, res) => {
   console.log(`[ASSIGNMENTS] GET /${req.params.id}/grading-status`);

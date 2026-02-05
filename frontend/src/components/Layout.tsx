@@ -2,7 +2,6 @@ import { NavLink, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard,
   FileText,
-  Upload,
   Settings,
   BookOpen,
   MessageSquare,
@@ -14,7 +13,6 @@ const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/rubrics', icon: FileText, label: 'Rubrics' },
   { to: '/assignments', icon: BookOpen, label: 'Assignments' },
-  { to: '/submissions', icon: Upload, label: 'Submissions' },
   { to: '/students', icon: Users, label: 'Students' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];

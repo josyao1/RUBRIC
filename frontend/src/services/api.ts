@@ -218,6 +218,34 @@ export const assignmentsApi = {
 
   getGradingStatus: (id: string) =>
     fetchApi<GradingStatus>(`/assignments/${id}/grading-status`),
+
+  regradeSelected: (id: string, submissionIds: string[], teacherPreferences?: string) =>
+    fetchApi<{ success: boolean; message: string; totalSubmissions: number }>(
+      `/assignments/${id}/regrade-selected`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ submissionIds, teacherPreferences }),
+      }
+    ),
+
+  uploadSubmissions: async (assignmentId: string, files: File[]) => {
+    const url = `${API_BASE}/submissions/upload`;
+    const formData = new FormData();
+    files.forEach((file) => formData.append('files', file));
+    formData.append('assignmentId', assignmentId);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Upload failed' }));
+      throw new Error(error.error || 'Upload failed');
+    }
+
+    return response.json();
+  },
 };
 
 // ============================================================================

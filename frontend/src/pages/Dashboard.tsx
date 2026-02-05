@@ -79,7 +79,7 @@ export default function Dashboard() {
   const statCards = [
     { label: 'Rubrics', value: stats?.totalRubrics || 0, icon: FileText, color: 'bg-blue-500', href: '/rubrics' },
     { label: 'Assignments', value: stats?.totalAssignments || 0, icon: BookOpen, color: 'bg-indigo-500', href: '/assignments' },
-    { label: 'Submissions', value: stats?.totalSubmissions || 0, icon: Upload, color: 'bg-purple-500', href: '/submissions' },
+    { label: 'Submissions', value: stats?.totalSubmissions || 0, icon: Upload, color: 'bg-purple-500', href: '/assignments' },
     { label: 'Students', value: stats?.totalStudents || 0, icon: Users, color: 'bg-teal-500', href: '/students' },
   ];
 
@@ -230,13 +230,13 @@ export default function Dashboard() {
               </div>
             </Link>
             <Link
-              to="/submissions"
+              to="/assignments"
               className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition-colors"
             >
               <Upload className="w-8 h-8 text-indigo-600" />
               <div className="ml-4">
                 <p className="font-medium text-gray-900">Upload Submissions</p>
-                <p className="text-sm text-gray-500">Add student work for grading</p>
+                <p className="text-sm text-gray-500">Open an assignment and upload work</p>
               </div>
             </Link>
             <Link

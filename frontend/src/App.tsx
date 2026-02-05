@@ -4,7 +4,6 @@ import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Rubrics from './pages/Rubrics';
 import Assignments from './pages/Assignments';
-import Submissions from './pages/Submissions';
 import Students from './pages/Students';
 import StudentFeedback from './pages/StudentFeedback';
 import Settings from './pages/Settings';
@@ -22,7 +21,6 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="rubrics" element={<Rubrics />} />
             <Route path="assignments" element={<Assignments />} />
-            <Route path="submissions" element={<Submissions />} />
             <Route path="students" element={<Students />} />
             <Route path="settings" element={<Settings />} />
           </Route>

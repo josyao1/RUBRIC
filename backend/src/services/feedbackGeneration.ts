@@ -382,7 +382,8 @@ async function generateSynthesizedFeedback(
 // =============================================================================
 export async function processAssignmentFeedback(
   assignmentId: string,
-  teacherPreferences?: string
+  teacherPreferences?: string,
+  submissionIds?: string[]
 ): Promise<void> {
   console.log(`[FEEDBACK] Starting feedback generation for assignment ${assignmentId}`);
 
@@ -408,7 +409,12 @@ export async function processAssignmentFeedback(
   if (!assignment) throw new Error('Assignment not found');
   if (!assignment.rubric) throw new Error('Assignment has no rubric linked');
 
-  if (assignment.submissions.length === 0) {
+  // Filter to specific submissions if IDs provided
+  const targetSubmissions = submissionIds
+    ? assignment.submissions.filter(s => submissionIds.includes(s.id))
+    : assignment.submissions;
+
+  if (targetSubmissions.length === 0) {
     console.log('[FEEDBACK] No submissions to process');
     await prisma.assignment.update({
       where: { id: assignmentId },
@@ -422,7 +428,7 @@ export async function processAssignmentFeedback(
     data: {
       gradingStatus: 'in_progress',
       gradingProgress: 0,
-      gradingTotal: assignment.submissions.length,
+      gradingTotal: targetSubmissions.length,
       teacherPreferences: teacherPreferences || null
     }
   });
@@ -435,7 +441,7 @@ export async function processAssignmentFeedback(
   }));
 
   let processed = 0;
-  for (const submission of assignment.submissions) {
+  for (const submission of targetSubmissions) {
     try {
       await prisma.submission.update({
         where: { id: submission.id },
@@ -478,10 +484,10 @@ export async function processAssignmentFeedback(
         data: { gradingProgress: processed }
       });
 
-      console.log(`[FEEDBACK] Progress: ${processed}/${assignment.submissions.length}`);
+      console.log(`[FEEDBACK] Progress: ${processed}/${targetSubmissions.length}`);
 
       // Pause before next submission
-      if (processed < assignment.submissions.length) {
+      if (processed < targetSubmissions.length) {
         await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CALLS_MS));
       }
     } catch (error) {
