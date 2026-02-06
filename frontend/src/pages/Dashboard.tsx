@@ -84,7 +84,7 @@ export default function Dashboard() {
   ];
 
   const feedbackStats = [
-    { label: 'Graded', value: stats?.gradedSubmissions || 0, icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50' },
+    { label: 'Feedback Ready', value: stats?.gradedSubmissions || 0, icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50' },
     { label: 'Pending', value: stats?.pendingGrading || 0, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
     { label: 'Released', value: stats?.feedbackReleased || 0, icon: Send, color: 'text-indigo-600', bg: 'bg-indigo-50' },
   ];
@@ -183,7 +183,7 @@ export default function Dashboard() {
                     {assignment.gradingStatus === 'in_progress' && (
                       <span className="flex items-center gap-1 text-xs text-blue-600">
                         <Loader2 className="w-3 h-3 animate-spin" />
-                        Grading
+                        Generating
                       </span>
                     )}
                     {assignment.gradingStatus === 'completed' && (
@@ -216,7 +216,7 @@ export default function Dashboard() {
               <FileText className="w-8 h-8 text-indigo-600" />
               <div className="ml-4">
                 <p className="font-medium text-gray-900">Create Rubric</p>
-                <p className="text-sm text-gray-500">Define grading criteria</p>
+                <p className="text-sm text-gray-500">Define feedback criteria</p>
               </div>
             </Link>
             <Link

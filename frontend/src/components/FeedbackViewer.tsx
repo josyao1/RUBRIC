@@ -215,7 +215,7 @@ export default function FeedbackViewer({ submissionId, onClose }: FeedbackViewer
               <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No feedback yet</h3>
               <p className="text-gray-500">
-                Feedback will appear here after grading is complete.
+                Feedback will appear here after feedback generation is complete.
               </p>
             </div>
           ) : activeTab === 'document' ? (

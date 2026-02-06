@@ -253,7 +253,7 @@ export default function Assignments() {
               {assignment.gradingStatus === 'error' && (
                 <div className="flex items-center text-sm text-red-600 mb-3">
                   <XCircle className="w-4 h-4 mr-1" />
-                  Grading error - try again
+                  Feedback error - try again
                 </div>
               )}
 
@@ -270,7 +270,7 @@ export default function Assignments() {
                       className="flex items-center text-indigo-600 hover:text-indigo-700 font-medium"
                     >
                       <Play className="w-3 h-3 mr-1" />
-                      {assignment.gradingStatus === 'completed' ? 'Re-grade' : 'Start Grading'}
+                      {assignment.gradingStatus === 'completed' ? 'Regenerate' : 'Generate Feedback'}
                     </button>
                   )}
                 </div>
@@ -1042,7 +1042,7 @@ function AssignmentDetailModal({ assignmentId, onClose, onUpdate, onStartGrading
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'ready': return 'Graded';
+      case 'ready': return 'Feedback Ready';
       case 'reviewed': return 'Reviewed';
       case 'processing': return 'Processing';
       default: return 'Pending';
@@ -1200,7 +1200,7 @@ function AssignmentDetailModal({ assignmentId, onClose, onUpdate, onStartGrading
             </div>
             <div className="bg-green-50 rounded-lg p-2.5 text-center">
               <p className="text-xl font-bold text-green-700">{stats.graded}</p>
-              <p className="text-xs text-green-600">Graded</p>
+              <p className="text-xs text-green-600">Feedback Ready</p>
             </div>
             <div className="bg-indigo-50 rounded-lg p-2.5 text-center">
               <p className="text-xl font-bold text-indigo-700">{stats.linked}</p>
@@ -1303,7 +1303,7 @@ function AssignmentDetailModal({ assignmentId, onClose, onUpdate, onStartGrading
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
-                        Regrade Selected ({selectedIds.size})
+                        Regenerate Selected ({selectedIds.size})
                       </button>
                     )}
                   </div>
@@ -1441,7 +1441,7 @@ function AssignmentDetailModal({ assignmentId, onClose, onUpdate, onStartGrading
                 className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
               >
                 <Play className="w-4 h-4 mr-2" />
-                {assignment.gradingStatus === 'completed' ? 'Re-grade All' : 'Grade All'}
+                {assignment.gradingStatus === 'completed' ? 'Regenerate All' : 'Generate All Feedback'}
               </button>
             )}
           </div>

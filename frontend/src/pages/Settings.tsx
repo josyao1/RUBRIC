@@ -121,7 +121,7 @@ export default function Settings() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 h-24 resize-none text-sm"
               />
               <p className="text-xs text-gray-500 mt-1">
-                These will be pre-filled when starting grading (can be edited per assignment)
+                These will be pre-filled when generating feedback (can be edited per assignment)
               </p>
             </div>
           </div>

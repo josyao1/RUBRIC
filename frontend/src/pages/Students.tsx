@@ -290,17 +290,17 @@ export default function Students() {
                       ) : (
                         <div className="flex items-center gap-2">
                           {statusSummary.ready > 0 && (
-                            <span className="flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded-full" title="Graded and ready">
+                            <span className="flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded-full" title="Feedback ready">
                               <CheckCircle className="w-3 h-3" /> {statusSummary.ready}
                             </span>
                           )}
                           {statusSummary.pending > 0 && (
-                            <span className="flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full" title="Awaiting grading">
+                            <span className="flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full" title="Awaiting feedback">
                               <Clock className="w-3 h-3" /> {statusSummary.pending}
                             </span>
                           )}
                           {statusSummary.processing > 0 && (
-                            <span className="flex items-center gap-1 text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full" title="Currently being graded">
+                            <span className="flex items-center gap-1 text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full" title="Generating feedback">
                               <Loader2 className="w-3 h-3 animate-spin" /> {statusSummary.processing}
                             </span>
                           )}
@@ -343,12 +343,12 @@ export default function Students() {
                             )}
                           </div>
                         ))}
-                        {/* Regraded submissions - needs re-release */}
+                        {/* Regenerated submissions - needs re-release */}
                         {getNeedsRereleaseSubmissions(student).map(sub => (
                           <span
                             key={sub.id}
                             className="flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-amber-100 text-amber-700"
-                            title={`${sub.assignment?.name || sub.fileName} - Regraded, needs re-release`}
+                            title={`${sub.assignment?.name || sub.fileName} - Regenerated, needs re-release`}
                           >
                             <AlertCircle className="w-3 h-3" />
                             Re-release needed
@@ -365,7 +365,7 @@ export default function Students() {
                          getNeedsRereleaseSubmissions(student).length === 0 &&
                          getReadyNotReleasedSubmissions(student).length === 0 &&
                          statusSummary.total > 0 && (
-                          <span className="text-gray-400 text-sm italic">Awaiting grading</span>
+                          <span className="text-gray-400 text-sm italic">Awaiting feedback</span>
                         )}
                         {statusSummary.total === 0 && (
                           <span className="text-gray-400 text-sm italic">—</span>

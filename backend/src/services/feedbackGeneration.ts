@@ -133,57 +133,83 @@ function buildInlineCommentsPrompt(
   criteria: RubricCriterion[],
   teacherPreferences?: string
 ): string {
-  const criteriaNames = criteria.map(c => c.name).join(', ');
+  const criteriaDescription = criteria.map(c => {
+    const levelsDesc = c.levels.map(l => `    - ${l.label}: ${l.description}`).join('\n');
+    return `**${c.name}**${c.description ? `: ${c.description}` : ''}\n  Performance Levels:\n${levelsDesc}`;
+  }).join('\n\n');
 
-  return `You are an experienced writing teacher giving focused, meaningful feedback.
-Only comment where it truly matters - quality over quantity.
+  return `You are an experienced educator providing rubric-based feedback. The rubric is your PRIMARY evaluation tool - every comment must connect to a specific rubric criterion and help the student understand how to meet that criterion's expectations.
 
-${teacherPreferences ? `TEACHER'S INSTRUCTIONS: ${teacherPreferences}\n\n` : ''}
-RUBRIC CRITERIA: ${criteriaNames}
+${teacherPreferences ? `=== TEACHER'S SPECIFIC INSTRUCTIONS ===\n${teacherPreferences}\n\n` : ''}
+=== THE RUBRIC (This is your primary evaluation tool) ===
+${criteriaDescription}
 
-STUDENT SUBMISSION:
----
+=== YOUR TASK ===
+Read the submission and identify 5-8 specific places where the work falls short of rubric expectations. Each comment must:
+1. Target a specific phrase that demonstrates a gap in meeting a rubric criterion
+2. Name which criterion it relates to
+3. Explain what's missing or weak according to that criterion's standards
+4. Tell the student specifically what to do to better meet that criterion
+
+=== HOW TO EVALUATE USING THE RUBRIC ===
+1. Go through EACH rubric criterion one by one
+2. For each criterion, find places in the submission that relate to it
+3. Compare what you see against the performance level descriptions
+4. If the work is below the top level, identify the specific gap
+5. Your comment should explain: "For [criterion], you need [X] but here you have [Y]. To improve, do [Z]."
+
+IMPORTANT: Do not give generic writing advice. Every comment must be grounded in what the rubric specifically asks for. If the rubric emphasizes "evidence," comment on evidence. If it emphasizes "analysis," comment on analysis. Let the rubric guide what you focus on.
+
+=== STUDENT SUBMISSION ===
 ${submissionText}
----
-
-Add 5-8 inline comments on the most important issues. Each comment should be worth the student's attention.
+=== END SUBMISSION ===
 
 Return JSON:
 {
   "inlineHighlights": [
     {
-      "highlightedText": "the specific phrase with the issue (3-10 words)",
-      "comment": "brief, clear guidance",
-      "criterionName": "relevant criterion"
+      "highlightedText": "exact phrase from submission (3-12 words)",
+      "comment": "Rubric-based feedback: what criterion this relates to, what's expected, what's missing, how to fix it",
+      "criterionName": "the exact rubric criterion name this relates to"
     }
   ]
 }
 
-WHAT DESERVES A COMMENT:
-- Claims without evidence or support
-- Unclear or confusing sentences that need rewriting
-- Logical gaps or missing transitions between ideas
-- Weak thesis or topic sentences
-- Grammar/mechanics errors that affect meaning
-- Places where more depth or analysis is needed
+=== COMMENT QUALITY STANDARDS ===
+Every comment should follow this pattern:
+"[What's wrong per the rubric] → [What the rubric expects] → [How to fix it]"
 
-WHAT DOES NOT DESERVE A COMMENT:
-- Random words that are fine in context
-- Minor stylistic preferences
-- Things that are already clear
-- Asking to "elaborate" on something self-explanatory
+BAD (generic, not rubric-based):
+"Unclear"
+"Needs more detail"
+"Awkward phrasing"
 
-COMMENT STYLE:
-- Be specific: "Add evidence" not just "?"
-- Be clear: "Unclear - what causes this?" not "Confusing"
-- Be helpful: "Connect this to your thesis" not just "Transition"
+GOOD (rubric-grounded):
+"This claim lacks the supporting evidence required by the Evidence criterion. Add a specific example or data point that demonstrates your claim."
 
-HIGHLIGHT RULES:
-- Highlight the specific phrase with the problem (3-10 words)
-- Copy text EXACTLY as written
+"For the Analysis criterion, you state what happened but not why it matters. After this sentence, add 2-3 sentences explaining the significance."
+
+"The Organization criterion requires clear transitions between ideas. This paragraph jumps topics - add a transition sentence connecting [previous idea] to [new idea]."
+
+=== WHAT TO COMMENT ON ===
+Focus ONLY on issues that relate to the rubric criteria provided. For each criterion, ask:
+- Does the submission meet the highest performance level for this criterion?
+- If not, where specifically does it fall short?
+- What would the student need to add/change/remove to reach a higher level?
+
+Do NOT comment on:
+- Issues unrelated to the rubric criteria (unless teacher instructions specify otherwise)
+- Things the student is already doing well (save praise for overall feedback)
+- Minor issues that don't affect rubric performance
+- Personal stylistic preferences not reflected in the rubric
+
+=== HIGHLIGHT RULES ===
+- Copy the EXACT text from the submission (3-12 words)
+- Highlight the specific phrase that demonstrates the rubric gap
 - Don't highlight random single words
+- The highlighted text should clearly show the issue you're addressing
 
-Return ONLY valid JSON.`;
+Return ONLY valid JSON, no markdown code blocks.`;
 }
 
 // =============================================================================
@@ -196,48 +222,93 @@ function buildSynthesizedFeedbackPrompt(
 ): string {
   const criteriaDescription = criteria.map(c => {
     const levelsDesc = c.levels.map(l => `    - ${l.label}: ${l.description}`).join('\n');
-    return `- ${c.name}: ${c.description || ''}\n${levelsDesc}`;
+    return `**${c.name}**${c.description ? `: ${c.description}` : ''}\n  Performance Levels (from highest to lowest):\n${levelsDesc}`;
   }).join('\n\n');
 
-  return `You are an experienced educator writing substantive feedback on student work.
-Goal: Help the student understand what to IMPROVE for their next draft.
+  return `You are an experienced educator providing criterion-based feedback that helps students understand exactly where their work stands and what to do next. Your feedback must be grounded in the rubric - every assessment should connect to specific performance levels.
 
-${teacherPreferences ? `TEACHER'S INSTRUCTIONS: ${teacherPreferences}\n\n` : ''}
-RUBRIC CRITERIA:
+${teacherPreferences ? `=== TEACHER'S SPECIFIC INSTRUCTIONS ===\n${teacherPreferences}\n\n` : ''}
+=== RUBRIC CRITERIA AND PERFORMANCE LEVELS ===
 ${criteriaDescription}
 
-STUDENT SUBMISSION:
----
-${submissionText}
----
+=== HOW TO APPLY THE RUBRIC ===
+For EACH criterion, you must:
+1. READ the student's work looking specifically for evidence related to that criterion
+2. COMPARE what you see against the performance level descriptions
+3. DETERMINE which level best describes the student's current performance
+4. EXPLAIN your assessment by pointing to specific evidence (or lack thereof) in their work
+5. PROVIDE concrete guidance on what would move them to the next level
 
-Provide detailed feedback in JSON:
+Be honest about performance levels:
+- If work is at "Beginning" or "Developing" level, say so clearly
+- Don't inflate assessments to make students feel better
+- Students can't improve if they don't know where they actually stand
+- It's not mean to be honest - it's respectful of their ability to grow
+
+=== STUDENT SUBMISSION ===
+${submissionText}
+=== END SUBMISSION ===
+
+Provide criterion-by-criterion feedback plus an overall assessment.
+
+Return JSON:
 {
   "sectionFeedback": [
     {
-      "criterionName": "Criterion Name",
-      "strengths": ["specific strength if genuinely present"],
-      "areasForGrowth": ["what needs improvement - be specific"],
-      "suggestions": ["concrete action: 'Try restructuring paragraph 2 to...'"]
+      "criterionName": "Exact Criterion Name from Rubric",
+      "strengths": ["Only list genuine strengths you can point to in the text. If there are none for this criterion, use an empty array []. Never fabricate strengths."],
+      "areasForGrowth": ["Be specific: 'The thesis in paragraph 1 states a topic but not an arguable claim' not 'thesis needs work'"],
+      "suggestions": ["Actionable rewrites: 'Revise your thesis to: [Your topic] + [Your position] + [Because/reasons]' not just 'strengthen thesis'"]
     }
   ],
   "overall": {
-    "summary": "2-3 sentences: honest assessment of where this work stands",
-    "priorityImprovements": ["most impactful change #1", "most impactful change #2"],
-    "encouragement": "brief acknowledgment of effort/progress (1 sentence, no fluff)",
-    "nextSteps": ["specific action for revision #1", "specific action #2"]
+    "summary": "2-3 sentences giving an honest assessment. Name the current performance level if clear. Example: 'This draft shows developing skills in analysis but needs significant work on evidence and organization to reach proficient level.'",
+    "priorityImprovements": ["The #1 change that would most improve this work", "The #2 most impactful change - be specific about what and how"],
+    "encouragement": "One brief, genuine sentence. Acknowledge specific effort you can see, not generic praise. If you can't point to something specific, just acknowledge they submitted work and can improve with revision.",
+    "nextSteps": ["First concrete action: 'Before your next draft, outline your argument with one claim per paragraph'", "Second action: 'For each claim, add at least one piece of specific evidence'"]
   }
 }
 
-GUIDELINES:
-- Be HONEST. If a criterion is weak, say so. Don't force strengths.
-- Be SPECIFIC. Not "improve organization" but "move the counterargument to paragraph 3"
-- Be ACTIONABLE. Every suggestion should tell them WHAT TO DO
-- Be RESPECTFUL but DIRECT. Critique the work, not the student.
-- Focus on the 2-3 changes that would have the BIGGEST impact
-- "encouragement" should acknowledge genuine effort, not empty praise
+=== FEEDBACK QUALITY STANDARDS ===
 
-Return ONLY valid JSON.`;
+STRENGTHS - Only include if genuinely present:
+BAD: "Shows effort" (meaningless)
+BAD: "Good vocabulary" (generic filler)
+GOOD: "The example in paragraph 3 about [specific thing] effectively illustrates the concept of [X]"
+GOOD: "The counterargument in paragraph 4 shows awareness of opposing views"
+BEST: If no genuine strengths exist for a criterion, return an empty array. This is honest and helpful.
+
+AREAS FOR GROWTH - Be specific and rubric-connected:
+BAD: "Organization needs improvement"
+BAD: "Could use more evidence"
+GOOD: "Currently at 'Developing' level for organization: paragraphs contain multiple unrelated ideas. 'Proficient' requires each paragraph to develop one clear point."
+GOOD: "The claim that 'technology is bad for society' in paragraph 2 has no supporting evidence - this is a 'Beginning' level issue per the rubric."
+
+SUGGESTIONS - Must be actionable, not vague:
+BAD: "Work on your thesis"
+BAD: "Add more analysis"
+GOOD: "Rewrite your thesis using this formula: [Topic] + [Your specific position] + [2-3 reasons why]. Current thesis: 'This essay is about climate change.' Revised: 'Climate change requires immediate government action because [reason 1], [reason 2], and [reason 3].'"
+GOOD: "After each piece of evidence, add 2-3 sentences explaining: (1) what this evidence shows, (2) why it matters to your argument, (3) how it connects to your thesis."
+
+OVERALL SUMMARY - Honest assessment:
+BAD: "Good effort on this essay!"
+BAD: "This essay has some strengths and some areas for improvement."
+GOOD: "This draft is at the 'Developing' level overall. The main argument is present but underdeveloped, with most claims lacking evidence. With focused revision on evidence and paragraph organization, this could reach 'Proficient.'"
+
+ENCOURAGEMENT - Genuine, not empty:
+BAD: "Great job!" / "Keep up the good work!" / "You're on the right track!"
+GOOD: "You've taken on a complex topic and made a clear attempt to structure an argument - that's the foundation to build on."
+GOOD: "This revision shows you addressed the feedback on thesis clarity from your last draft."
+ACCEPTABLE: "With focused revision on the priority areas above, you can significantly strengthen this work."
+
+=== CRITICAL RULES ===
+1. Every piece of feedback must connect to the rubric criteria and levels
+2. Never fabricate strengths - empty arrays are better than fake praise
+3. Be direct about weaknesses - students need to know what to fix
+4. Make suggestions specific enough that students know exactly what to do
+5. The goal is improvement, not making students feel good about mediocre work
+
+Return ONLY valid JSON, no markdown code blocks.`;
 }
 
 // =============================================================================
