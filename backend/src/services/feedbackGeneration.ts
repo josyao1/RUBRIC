@@ -3,12 +3,12 @@ import prisma from '../db/prisma.js';
 
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
-// Rate limiting settings
+// Rate limiting and retry settings
 const DELAY_BETWEEN_CALLS_MS = 4000;
-const MAX_RETRIES = 3;
-const INITIAL_RETRY_DELAY_MS = 25000; // Start with 25s for rate limit errors
+const MAX_RETRIES = 5;
+const INITIAL_RETRY_DELAY_MS = 10000; // Start with 10s for retryable errors
 
-// Helper to call Gemini API with retry logic for rate limits
+// Helper to call Gemini API with retry logic for rate limits and overload errors
 async function callGeminiWithRetry(prompt: string, retryCount = 0): Promise<string> {
   try {
     const response = await genAI.models.generateContent({
@@ -17,31 +17,45 @@ async function callGeminiWithRetry(prompt: string, retryCount = 0): Promise<stri
     });
     return response.text || '';
   } catch (error: any) {
-    // Check if it's a rate limit error (429)
-    if (error?.status === 429) {
-      // Check if this is a daily quota error (free tier)
-      const isDailyQuota = error?.message?.includes('free_tier') || error?.message?.includes('FreeTier');
+    const status = error?.status;
+    const isRateLimit = status === 429;
+    const isOverloaded = status === 503;
+    const isServerError = status >= 500 && status < 600;
 
+    // Check if this is a daily quota error (free tier) - don't retry these
+    if (isRateLimit) {
+      const isDailyQuota = error?.message?.includes('free_tier') || error?.message?.includes('FreeTier');
       if (isDailyQuota) {
         console.error(`[FEEDBACK] Daily quota exceeded. Free tier allows only 20 requests/day (~10 submissions).`);
         console.error(`[FEEDBACK] Consider upgrading to a paid Gemini API plan for more capacity.`);
         throw new Error('Daily API quota exceeded. Free tier limit reached. Try again tomorrow or upgrade your Gemini API plan.');
       }
+    }
 
-      if (retryCount < MAX_RETRIES) {
-        // Extract retry delay from error if available, otherwise use exponential backoff
-        let retryDelay = INITIAL_RETRY_DELAY_MS * Math.pow(2, retryCount);
+    // Retry on rate limits (429), overloaded (503), and other server errors (5xx)
+    if ((isRateLimit || isOverloaded || isServerError) && retryCount < MAX_RETRIES) {
+      // Calculate delay with exponential backoff
+      let retryDelay = INITIAL_RETRY_DELAY_MS * Math.pow(2, retryCount);
 
-        // Try to parse retry delay from error message
-        const retryMatch = error?.message?.match(/retry in (\d+(?:\.\d+)?)/i);
-        if (retryMatch) {
-          retryDelay = Math.ceil(parseFloat(retryMatch[1]) * 1000) + 2000; // Add 2s buffer
-        }
-
-        console.log(`[FEEDBACK] Rate limited, waiting ${retryDelay/1000}s before retry ${retryCount + 1}/${MAX_RETRIES}`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-        return callGeminiWithRetry(prompt, retryCount + 1);
+      // Try to parse retry delay from error message if available
+      const retryMatch = error?.message?.match(/retry in (\d+(?:\.\d+)?)/i);
+      if (retryMatch) {
+        retryDelay = Math.ceil(parseFloat(retryMatch[1]) * 1000) + 2000; // Add 2s buffer
       }
+
+      // Cap max delay at 2 minutes
+      retryDelay = Math.min(retryDelay, 120000);
+
+      const errorType = isRateLimit ? 'Rate limited' : isOverloaded ? 'Model overloaded' : `Server error (${status})`;
+      console.log(`[FEEDBACK] ${errorType}, waiting ${retryDelay/1000}s before retry ${retryCount + 1}/${MAX_RETRIES}`);
+
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+      return callGeminiWithRetry(prompt, retryCount + 1);
+    }
+
+    // If we've exhausted retries or it's a non-retryable error, throw
+    if (retryCount >= MAX_RETRIES) {
+      console.error(`[FEEDBACK] Max retries (${MAX_RETRIES}) exceeded for error ${status}`);
     }
     throw error;
   }
@@ -154,11 +168,15 @@ Read the submission and identify 5-8 specific places where the work falls short 
 === HOW TO EVALUATE USING THE RUBRIC ===
 1. Go through EACH rubric criterion one by one
 2. For each criterion, find places in the submission that relate to it
-3. Compare what you see against the performance level descriptions
-4. If the work is below the top level, identify the specific gap
-5. Your comment should explain: "For [criterion], you need [X] but here you have [Y]. To improve, do [Z]."
+3. Use the performance level descriptions to understand what strong work looks like
+4. Identify gaps between what the student did and what strong work requires
+5. Your comment should explain what's missing and how to improve - WITHOUT naming or referencing performance levels
 
-IMPORTANT: Do not give generic writing advice. Every comment must be grounded in what the rubric specifically asks for. If the rubric emphasizes "evidence," comment on evidence. If it emphasizes "analysis," comment on analysis. Let the rubric guide what you focus on.
+IMPORTANT:
+- Do not give generic writing advice. Every comment must be grounded in what the rubric specifically asks for.
+- If the rubric emphasizes "evidence," comment on evidence. If it emphasizes "analysis," comment on analysis.
+- NEVER tell students what level they are at (e.g., "This is at Developing level"). Just tell them what to improve and how.
+- Use the rubric levels internally to calibrate your feedback, but the student should only see actionable guidance.
 
 === STUDENT SUBMISSION ===
 ${submissionText}
@@ -225,25 +243,25 @@ function buildSynthesizedFeedbackPrompt(
     return `**${c.name}**${c.description ? `: ${c.description}` : ''}\n  Performance Levels (from highest to lowest):\n${levelsDesc}`;
   }).join('\n\n');
 
-  return `You are an experienced educator providing criterion-based feedback that helps students understand exactly where their work stands and what to do next. Your feedback must be grounded in the rubric - every assessment should connect to specific performance levels.
+  return `You are an experienced educator providing criterion-based feedback that helps students understand what to improve and how. Your feedback must be grounded in the rubric criteria - use the performance level descriptions to understand what strong work looks like, then guide students toward that standard.
 
 ${teacherPreferences ? `=== TEACHER'S SPECIFIC INSTRUCTIONS ===\n${teacherPreferences}\n\n` : ''}
 === RUBRIC CRITERIA AND PERFORMANCE LEVELS ===
 ${criteriaDescription}
 
-=== HOW TO APPLY THE RUBRIC ===
-For EACH criterion, you must:
+=== HOW TO USE THE RUBRIC ===
+For EACH criterion:
 1. READ the student's work looking specifically for evidence related to that criterion
-2. COMPARE what you see against the performance level descriptions
-3. DETERMINE which level best describes the student's current performance
-4. EXPLAIN your assessment by pointing to specific evidence (or lack thereof) in their work
-5. PROVIDE concrete guidance on what would move them to the next level
+2. USE the performance level descriptions to understand what excellent work looks like
+3. IDENTIFY the gaps between what the student did and what strong work requires
+4. EXPLAIN what's missing or could be stronger, with specific examples from their work
+5. PROVIDE concrete guidance on how to improve
 
-Be honest about performance levels:
-- If work is at "Beginning" or "Developing" level, say so clearly
-- Don't inflate assessments to make students feel better
-- Students can't improve if they don't know where they actually stand
-- It's not mean to be honest - it's respectful of their ability to grow
+IMPORTANT - DO NOT mention performance levels to the student:
+- Use the levels internally to calibrate your feedback, but never say "you're at Developing level" or similar
+- Instead of "this is Beginning level work," say "this section needs [specific improvement]"
+- Focus on WHAT to improve and HOW, not on labeling or evaluating their current standing
+- The goal is forward-looking guidance, not assessment
 
 === STUDENT SUBMISSION ===
 ${submissionText}
@@ -262,7 +280,7 @@ Return JSON:
     }
   ],
   "overall": {
-    "summary": "2-3 sentences giving an honest assessment. Name the current performance level if clear. Example: 'This draft shows developing skills in analysis but needs significant work on evidence and organization to reach proficient level.'",
+    "summary": "2-3 sentences describing the main areas that need attention. Focus on what to work on, not on evaluating quality. Example: 'The main argument comes through but needs stronger evidence throughout. Focus revision on supporting each claim with specific examples.'",
     "priorityImprovements": ["The #1 change that would most improve this work", "The #2 most impactful change - be specific about what and how"],
     "encouragement": "One brief, genuine sentence. Acknowledge specific effort you can see, not generic praise. If you can't point to something specific, just acknowledge they submitted work and can improve with revision.",
     "nextSteps": ["First concrete action: 'Before your next draft, outline your argument with one claim per paragraph'", "Second action: 'For each claim, add at least one piece of specific evidence'"]
@@ -274,15 +292,16 @@ Return JSON:
 STRENGTHS - Only include if genuinely present:
 BAD: "Shows effort" (meaningless)
 BAD: "Good vocabulary" (generic filler)
-GOOD: "The example in paragraph 3 about [specific thing] effectively illustrates the concept of [X]"
+GOOD: "The example in paragraph 3 about [specific thing] effectively illustrates the concept"
 GOOD: "The counterargument in paragraph 4 shows awareness of opposing views"
 BEST: If no genuine strengths exist for a criterion, return an empty array. This is honest and helpful.
 
-AREAS FOR GROWTH - Be specific and rubric-connected:
-BAD: "Organization needs improvement"
-BAD: "Could use more evidence"
-GOOD: "Currently at 'Developing' level for organization: paragraphs contain multiple unrelated ideas. 'Proficient' requires each paragraph to develop one clear point."
-GOOD: "The claim that 'technology is bad for society' in paragraph 2 has no supporting evidence - this is a 'Beginning' level issue per the rubric."
+AREAS FOR GROWTH - Be specific, describe what's missing:
+BAD: "Organization needs improvement" (vague)
+BAD: "Could use more evidence" (generic)
+BAD: "This is at Developing level" (don't mention levels!)
+GOOD: "Several paragraphs try to cover multiple ideas at once. Each paragraph should develop one clear point."
+GOOD: "The claim that 'technology is bad for society' in paragraph 2 has no supporting evidence. Add a specific example or data."
 
 SUGGESTIONS - Must be actionable, not vague:
 BAD: "Work on your thesis"
@@ -290,10 +309,11 @@ BAD: "Add more analysis"
 GOOD: "Rewrite your thesis using this formula: [Topic] + [Your specific position] + [2-3 reasons why]. Current thesis: 'This essay is about climate change.' Revised: 'Climate change requires immediate government action because [reason 1], [reason 2], and [reason 3].'"
 GOOD: "After each piece of evidence, add 2-3 sentences explaining: (1) what this evidence shows, (2) why it matters to your argument, (3) how it connects to your thesis."
 
-OVERALL SUMMARY - Honest assessment:
-BAD: "Good effort on this essay!"
-BAD: "This essay has some strengths and some areas for improvement."
-GOOD: "This draft is at the 'Developing' level overall. The main argument is present but underdeveloped, with most claims lacking evidence. With focused revision on evidence and paragraph organization, this could reach 'Proficient.'"
+OVERALL SUMMARY - Forward-looking, not evaluative:
+BAD: "Good effort on this essay!" (empty)
+BAD: "This is at the Developing level overall." (don't mention levels!)
+BAD: "This essay has some strengths and some areas for improvement." (says nothing)
+GOOD: "The main argument is present but underdeveloped - most claims need supporting evidence. Focus your revision on adding specific examples and explaining how each one supports your thesis."
 
 ENCOURAGEMENT - Genuine, not empty:
 BAD: "Great job!" / "Keep up the good work!" / "You're on the right track!"
@@ -302,11 +322,12 @@ GOOD: "This revision shows you addressed the feedback on thesis clarity from you
 ACCEPTABLE: "With focused revision on the priority areas above, you can significantly strengthen this work."
 
 === CRITICAL RULES ===
-1. Every piece of feedback must connect to the rubric criteria and levels
-2. Never fabricate strengths - empty arrays are better than fake praise
-3. Be direct about weaknesses - students need to know what to fix
-4. Make suggestions specific enough that students know exactly what to do
-5. The goal is improvement, not making students feel good about mediocre work
+1. Every piece of feedback must connect to what the rubric criteria ask for
+2. NEVER mention performance levels (Excellent, Proficient, Developing, Beginning, etc.) - just describe what to improve
+3. Never fabricate strengths - empty arrays are better than fake praise
+4. Be direct about what needs work - students need to know what to fix
+5. Make suggestions specific enough that students know exactly what to do
+6. The goal is to guide improvement, not to evaluate or grade
 
 Return ONLY valid JSON, no markdown code blocks.`;
 }
