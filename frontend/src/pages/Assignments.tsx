@@ -835,6 +835,8 @@ function AssignmentDetailModal({ assignmentId, onClose, onUpdate, onStartGrading
   // Release
   const [releasing, setReleasing] = useState(false);
   const [releaseResult, setReleaseResult] = useState<string | null>(null);
+  const [sendEmail, setSendEmail] = useState(false);
+  const [reRelease, setReRelease] = useState(false);
 
   // Copy link
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
@@ -962,11 +964,18 @@ function AssignmentDetailModal({ assignmentId, onClose, onUpdate, onStartGrading
     setReleasing(true);
     setReleaseResult(null);
     try {
-      const result = await studentsApi.releaseFeedback(assignmentId, false);
-      setReleaseResult(`Released feedback for ${result.released.length} submission(s)`);
+      const result = await studentsApi.releaseFeedback(assignmentId, sendEmail, reRelease);
+      let message = `Released feedback for ${result.released.length} submission(s)`;
+      if (result.emailResults && result.emailResults.sent > 0) {
+        message += ` • ${result.emailResults.sent} email(s) sent`;
+      }
+      if (result.emailResults && result.emailResults.failed.length > 0) {
+        message += ` • ${result.emailResults.failed.length} email(s) failed`;
+      }
+      setReleaseResult(message);
       // Reload to get updated feedbackReleased flags
       await loadAssignment();
-      setTimeout(() => setReleaseResult(null), 4000);
+      setTimeout(() => setReleaseResult(null), 6000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to release feedback');
     } finally {
@@ -1418,20 +1427,40 @@ function AssignmentDetailModal({ assignmentId, onClose, onUpdate, onStartGrading
           >
             Close
           </button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
             {canRelease && (
-              <button
-                onClick={handleReleaseFeedback}
-                disabled={releasing}
-                className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 text-sm"
-              >
-                {releasing ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4 mr-2" />
-                )}
-                {releasing ? 'Releasing...' : 'Release Feedback'}
-              </button>
+              <>
+                <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={reRelease}
+                    onChange={(e) => setReRelease(e.target.checked)}
+                    className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                  />
+                  Re-release
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={sendEmail}
+                    onChange={(e) => setSendEmail(e.target.checked)}
+                    className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                  />
+                  Send emails
+                </label>
+                <button
+                  onClick={handleReleaseFeedback}
+                  disabled={releasing}
+                  className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 text-sm"
+                >
+                  {releasing ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4 mr-2" />
+                  )}
+                  {releasing ? 'Releasing...' : 'Release Feedback'}
+                </button>
+              </>
             )}
             {assignment.rubricName &&
              assignment.submissions.length > 0 &&

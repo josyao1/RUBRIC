@@ -406,10 +406,14 @@ export const studentsApi = {
       body: JSON.stringify({ submissionId, studentId }),
     }),
 
-  releaseFeedback: (assignmentId: string, sendEmail: boolean = false) =>
-    fetchApi<{ released: ReleasedFeedback[]; errors: any[] }>('/students/release-feedback', {
+  releaseFeedback: (assignmentId: string, sendEmail: boolean = false, reRelease: boolean = false) =>
+    fetchApi<{
+      released: ReleasedFeedback[];
+      errors: any[];
+      emailResults?: { sent: number; failed: { email: string; error: string }[] };
+    }>('/students/release-feedback', {
       method: 'POST',
-      body: JSON.stringify({ assignmentId, sendEmail }),
+      body: JSON.stringify({ assignmentId, sendEmail, reRelease, baseUrl: window.location.origin }),
     }),
 
   getFeedback: (token: string) =>

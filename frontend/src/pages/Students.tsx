@@ -633,15 +633,20 @@ function ReleaseModal({ assignments, onClose, onRelease }: {
 }) {
   const [selectedAssignment, setSelectedAssignment] = useState('');
   const [sendEmail, setSendEmail] = useState(false);
+  const [reRelease, setReRelease] = useState(false);
   const [releasing, setReleasing] = useState(false);
-  const [result, setResult] = useState<{ released: ReleasedFeedback[]; errors: any[] } | null>(null);
+  const [result, setResult] = useState<{
+    released: ReleasedFeedback[];
+    errors: any[];
+    emailResults?: { sent: number; failed: { email: string; error: string }[] };
+  } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
   const handleRelease = async () => {
     if (!selectedAssignment) return;
     setReleasing(true);
     try {
-      const result = await studentsApi.releaseFeedback(selectedAssignment, sendEmail);
+      const result = await studentsApi.releaseFeedback(selectedAssignment, sendEmail, reRelease);
       setResult(result);
       onRelease();
     } catch (err) {
@@ -692,19 +697,36 @@ function ReleaseModal({ assignments, onClose, onRelease }: {
               )}
             </div>
 
-            <div className="mb-4">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={sendEmail}
-                  onChange={(e) => setSendEmail(e.target.checked)}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                <span className="text-sm text-gray-700">Send email notifications to students</span>
-              </label>
-              <p className="text-xs text-gray-500 ml-6 mt-1">
-                (Email sending not yet implemented - links will be generated)
-              </p>
+            <div className="mb-4 space-y-3">
+              <div>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={reRelease}
+                    onChange={(e) => setReRelease(e.target.checked)}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-sm text-gray-700">Re-release already released feedback</span>
+                </label>
+                <p className="text-xs text-gray-500 ml-6 mt-1">
+                  Include submissions that were previously released (useful for testing or sending updated feedback)
+                </p>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={sendEmail}
+                    onChange={(e) => setSendEmail(e.target.checked)}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-sm text-gray-700">Send email notifications to students</span>
+                </label>
+                <p className="text-xs text-gray-500 ml-6 mt-1">
+                  Students will receive an email with their feedback link
+                </p>
+              </div>
             </div>
 
             <div className="flex justify-end gap-3">
@@ -732,6 +754,33 @@ function ReleaseModal({ assignments, onClose, onRelease }: {
                     Released feedback to {result.released.length} student{result.released.length !== 1 ? 's' : ''}
                   </p>
                 </div>
+
+                {/* Email Results */}
+                {result.emailResults && (
+                  <div className={`p-3 rounded-lg mb-4 ${
+                    result.emailResults.failed.length > 0
+                      ? 'bg-amber-50 border border-amber-200'
+                      : 'bg-blue-50 border border-blue-200'
+                  }`}>
+                    <p className={`font-medium ${
+                      result.emailResults.failed.length > 0 ? 'text-amber-800' : 'text-blue-800'
+                    }`}>
+                      {result.emailResults.sent} email{result.emailResults.sent !== 1 ? 's' : ''} sent
+                      {result.emailResults.failed.length > 0 && (
+                        <span className="text-amber-600">
+                          {' '}({result.emailResults.failed.length} failed)
+                        </span>
+                      )}
+                    </p>
+                    {result.emailResults.failed.length > 0 && (
+                      <ul className="mt-2 text-xs text-amber-700">
+                        {result.emailResults.failed.map((f, i) => (
+                          <li key={i}>{f.email}: {f.error}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
 
                 <h3 className="font-medium text-gray-900 mb-2">Student Links:</h3>
                 <div className="space-y-2 max-h-60 overflow-auto">
