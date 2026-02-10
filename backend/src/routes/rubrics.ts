@@ -509,6 +509,96 @@ router.get('/:id/file', async (req, res) => {
   }
 });
 
+// Get AI feedback on rubric quality
+router.post('/:id/feedback', async (req, res) => {
+  console.log(`[RUBRIC FEEDBACK] POST /${req.params.id}/feedback - Generating feedback`);
+  try {
+    const rubric = await prisma.rubric.findUnique({
+      where: { id: req.params.id },
+      include: {
+        criteria: {
+          include: {
+            levels: { orderBy: { sortOrder: 'asc' } }
+          },
+          orderBy: { sortOrder: 'asc' }
+        }
+      }
+    });
+
+    if (!rubric) {
+      return res.status(404).json({ error: 'Rubric not found' });
+    }
+
+    if (!rubric.criteria || rubric.criteria.length === 0) {
+      return res.status(400).json({ error: 'Rubric has no criteria to analyze' });
+    }
+
+    // Build rubric text representation for the AI
+    let rubricText = `Rubric: ${rubric.name}\n`;
+    if (rubric.description) rubricText += `Description: ${rubric.description}\n`;
+    rubricText += '\nCriteria:\n';
+
+    for (const criterion of rubric.criteria) {
+      rubricText += `\n## ${criterion.name}\n`;
+      if (criterion.description) rubricText += `Description: ${criterion.description}\n`;
+
+      if (criterion.levels && criterion.levels.length > 0) {
+        rubricText += 'Performance Levels:\n';
+        for (const level of criterion.levels) {
+          rubricText += `  - ${level.label}: ${level.description}\n`;
+        }
+      }
+    }
+
+    console.log(`[RUBRIC FEEDBACK] Analyzing rubric with ${rubric.criteria.length} criteria`);
+
+    // Import Gemini
+    const { GoogleGenAI } = await import('@google/genai');
+    const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+
+    // TODO: Replace this placeholder prompt with the optimized prompt from research
+    const systemPrompt = `You are an expert in educational assessment and rubric design.
+        Analyze the following rubric and provide constructive feedback to help the teacher improve it.
+
+        PLACEHOLDER: This prompt will be replaced with an optimized prompt based on rubric research.
+
+        For now, provide feedback on:
+        1. Clarity of criteria
+        2. Specificity of performance level descriptions
+        3. Alignment between criteria and levels
+        4. Suggestions for improvement
+
+        Be constructive and specific in your feedback.`;
+
+    const response = await genAI.models.generateContent({
+      model: 'gemini-2.5-flash-lite',
+      contents: [{ role: 'user', parts: [{ text: rubricText }] }],
+      config: {
+        systemInstruction: systemPrompt
+      }
+    });
+
+    const feedbackText = response.text || 'Unable to generate feedback. Please try again.';
+
+    console.log(`[RUBRIC FEEDBACK] Generated ${feedbackText.length} chars of feedback`);
+
+    res.json({
+      rubricId: rubric.id,
+      rubricName: rubric.name,
+      feedback: feedbackText,
+      generatedAt: new Date().toISOString()
+    });
+  } catch (error: any) {
+    console.error('[RUBRIC FEEDBACK] Error:', error);
+
+    if (error?.status === 429) {
+      return res.status(429).json({ error: 'AI rate limit reached. Please try again in a moment.' });
+    }
+
+    res.status(500).json({ error: error.message || 'Failed to generate rubric feedback' });
+  }
+});
+
 // Delete rubric
 router.delete('/:id', async (req, res) => {
   try {

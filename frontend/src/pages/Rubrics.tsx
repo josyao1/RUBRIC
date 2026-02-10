@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Plus, Upload, FileText, Trash2, GripVertical, Loader2, AlertCircle, Eye, Image } from 'lucide-react';
+import { Plus, Upload, FileText, Trash2, GripVertical, Loader2, AlertCircle, Eye, Image, MessageSquare, Sparkles } from 'lucide-react';
 import { rubricsApi, getFileUrl, type Rubric, type Criterion } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -492,7 +492,7 @@ function ViewRubricModal({ rubric, onClose }: {
   rubric: Rubric;
   onClose: () => void;
 }) {
-  const [activeTab, setActiveTab] = useState<'criteria' | 'source'>('criteria');
+  const [activeTab, setActiveTab] = useState<'criteria' | 'source' | 'feedback'>('criteria');
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -502,6 +502,14 @@ function ViewRubricModal({ rubric, onClose }: {
   const [description, setDescription] = useState(rubric.description || '');
   const [criteria, setCriteria] = useState<Criterion[]>([]);
   const [sourceFile, setSourceFile] = useState<string | undefined>();
+
+  // Feedback state
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
+  const [feedbackResult, setFeedbackResult] = useState<{
+    feedback: string;
+    generatedAt: string;
+  } | null>(null);
 
   // Fetch full rubric with criteria and levels
   useEffect(() => {
@@ -570,6 +578,22 @@ function ViewRubricModal({ rubric, onClose }: {
     }
   };
 
+  const handleGetFeedback = async () => {
+    setFeedbackLoading(true);
+    setFeedbackError(null);
+    try {
+      const result = await rubricsApi.getFeedback(rubric.id);
+      setFeedbackResult({
+        feedback: result.feedback,
+        generatedAt: result.generatedAt
+      });
+    } catch (err) {
+      setFeedbackError(err instanceof Error ? err.message : 'Failed to get feedback');
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -631,6 +655,17 @@ function ViewRubricModal({ rubric, onClose }: {
             >
               <Image className="w-4 h-4" />
               Original Document
+            </button>
+            <button
+              onClick={() => setActiveTab('feedback')}
+              className={`py-3 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                activeTab === 'feedback'
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4" />
+              AI Feedback
             </button>
           </div>
         </div>
@@ -795,7 +830,7 @@ function ViewRubricModal({ rubric, onClose }: {
                 </div>
               )}
             </div>
-          ) : (
+          ) : activeTab === 'source' ? (
             /* Source file preview */
             <div>
               {sourceFile ? (
@@ -824,6 +859,94 @@ function ViewRubricModal({ rubric, onClose }: {
                 <div className="text-center py-12 text-gray-500">
                   <FileText className="w-12 h-12 mx-auto mb-4 text-gray-400" />
                   <p>No source document (rubric was created manually)</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* AI Feedback tab */
+            <div>
+              {feedbackError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  {feedbackError}
+                </div>
+              )}
+
+              {!feedbackResult ? (
+                <div className="text-center py-12">
+                  <Sparkles className="w-12 h-12 mx-auto mb-4 text-indigo-400" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Get AI Feedback on Your Rubric</h3>
+                  <p className="text-gray-500 mb-6 max-w-md mx-auto">
+                    Our AI will analyze your rubric and provide suggestions for improving clarity,
+                    specificity, and alignment of your criteria and performance levels.
+                  </p>
+                  <button
+                    onClick={handleGetFeedback}
+                    disabled={feedbackLoading || criteria.length === 0}
+                    className="inline-flex items-center px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {feedbackLoading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Analyzing Rubric...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-5 h-5 mr-2" />
+                        Get Feedback
+                      </>
+                    )}
+                  </button>
+                  {criteria.length === 0 && (
+                    <p className="text-sm text-amber-600 mt-4">
+                      Add criteria to your rubric before requesting feedback.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-indigo-600" />
+                      <h3 className="font-medium text-gray-900">AI Feedback</h3>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-gray-500">
+                        Generated {new Date(feedbackResult.generatedAt).toLocaleString()}
+                      </span>
+                      <button
+                        onClick={handleGetFeedback}
+                        disabled={feedbackLoading}
+                        className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                      >
+                        {feedbackLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Sparkles className="w-4 h-4" />
+                            Regenerate
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="prose prose-sm max-w-none bg-gray-50 rounded-lg p-6 border border-gray-200">
+                    {feedbackResult.feedback.split('\n').map((line, idx) => {
+                      if (line.startsWith('##')) {
+                        return <h3 key={idx} className="text-lg font-semibold text-gray-900 mt-4 mb-2">{line.replace(/^##\s*/, '')}</h3>;
+                      } else if (line.startsWith('#')) {
+                        return <h2 key={idx} className="text-xl font-bold text-gray-900 mt-6 mb-3">{line.replace(/^#\s*/, '')}</h2>;
+                      } else if (line.startsWith('- ') || line.startsWith('* ')) {
+                        return <li key={idx} className="ml-4 text-gray-700">{line.replace(/^[-*]\s*/, '')}</li>;
+                      } else if (line.match(/^\d+\./)) {
+                        return <li key={idx} className="ml-4 text-gray-700 list-decimal">{line.replace(/^\d+\.\s*/, '')}</li>;
+                      } else if (line.trim() === '') {
+                        return <br key={idx} />;
+                      } else {
+                        return <p key={idx} className="text-gray-700 mb-2">{line}</p>;
+                      }
+                    })}
+                  </div>
                 </div>
               )}
             </div>

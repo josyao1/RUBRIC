@@ -129,6 +129,17 @@ export const rubricsApi = {
     fetchApi<Rubric>(`/rubrics/${id}/parse`, {
       method: 'POST',
     }),
+
+  // Get AI feedback on rubric quality
+  getFeedback: (id: string) =>
+    fetchApi<{
+      rubricId: string;
+      rubricName: string;
+      feedback: string;
+      generatedAt: string;
+    }>(`/rubrics/${id}/feedback`, {
+      method: 'POST',
+    }),
 };
 
 // ============================================================================
