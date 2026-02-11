@@ -556,19 +556,56 @@ router.post('/:id/feedback', async (req, res) => {
     const { GoogleGenAI } = await import('@google/genai');
     const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
-    // TODO: Replace this placeholder prompt with the optimized prompt from research
-    const systemPrompt = `You are an expert in educational assessment and rubric design.
-        Analyze the following rubric and provide constructive feedback to help the teacher improve it.
+    // Research-informed prompt based on AACU VALUE Rubrics and equity-centered rubric design principles
+    const systemPrompt = `You are an expert in educational assessment and rubric design, drawing on research from the AACU VALUE Rubrics and equity-centered pedagogy.
 
-        PLACEHOLDER: This prompt will be replaced with an optimized prompt based on rubric research.
+Analyze the provided rubric and give the teacher actionable feedback to improve it. Structure your response with these sections:
 
-        For now, provide feedback on:
-        1. Clarity of criteria
-        2. Specificity of performance level descriptions
-        3. Alignment between criteria and levels
-        4. Suggestions for improvement
+## Overall Assessment
+A 2-3 sentence summary of the rubric's current strengths and primary areas for improvement.
 
-        Be constructive and specific in your feedback.`;
+## Transparency & Clarity
+Evaluate whether the rubric clearly communicates expectations:
+- Are criteria specific enough that students understand exactly what is expected?
+- Is the language accessible, or does it use jargon that might confuse students?
+- Would a student reading this know precisely how their work will be evaluated?
+
+## Quality Progression Between Levels
+Analyze the performance level descriptions:
+- Do they clearly show what distinguishes each level from adjacent ones?
+- Can a student understand HOW to move from "Developing" to "Proficient" or from "Good" to "Excellent"?
+- Are the differences between levels meaningful and observable, not just degree words ("somewhat", "very")?
+
+## Learning-Focused vs. Scoring-Focused
+Assess whether this rubric functions as a growth tool:
+- Does it emphasize skills and competencies students should develop?
+- Could it be used for self-assessment and reflection, not just grading?
+- Does it support feedback conversations or just assign scores?
+
+## Equity & Accessibility
+Consider whether the rubric is rigorous yet equitable:
+- Are criteria culturally responsive and not biased toward particular backgrounds?
+- Is rigor achieved through clear expectations rather than hidden standards?
+- Would diverse students have equal opportunity to demonstrate mastery?
+
+## Opportunities for Co-Creation
+Suggest how students could be involved:
+- Which criteria or level descriptions could be refined WITH students?
+- How might student input increase ownership and reduce grading disputes?
+- Are there places where student voice would strengthen the rubric?
+
+## Specific Recommendations
+Provide 3-5 concrete, actionable improvements. For each:
+- Quote the specific text that needs revision (if applicable)
+- Explain WHY it should change
+- Offer a revised version or specific suggestion
+
+FORMAT GUIDELINES:
+- Be constructive and collegial—you're helping a fellow educator improve their practice
+- Give specific examples, not vague generalities
+- When suggesting rewrites, show before/after
+- Prioritize the most impactful changes first
+- Keep total response under 800 words for readability`;
 
     const response = await genAI.models.generateContent({
       model: 'gemini-2.5-flash-lite',
@@ -582,11 +619,22 @@ router.post('/:id/feedback', async (req, res) => {
 
     console.log(`[RUBRIC FEEDBACK] Generated ${feedbackText.length} chars of feedback`);
 
+    // Save feedback to database
+    const savedFeedback = await prisma.rubricFeedback.create({
+      data: {
+        rubricId: rubric.id,
+        feedback: feedbackText
+      }
+    });
+
+    console.log(`[RUBRIC FEEDBACK] Saved feedback with ID: ${savedFeedback.id}`);
+
     res.json({
+      id: savedFeedback.id,
       rubricId: rubric.id,
       rubricName: rubric.name,
       feedback: feedbackText,
-      generatedAt: new Date().toISOString()
+      generatedAt: savedFeedback.generatedAt.toISOString()
     });
   } catch (error: any) {
     console.error('[RUBRIC FEEDBACK] Error:', error);
@@ -596,6 +644,52 @@ router.post('/:id/feedback', async (req, res) => {
     }
 
     res.status(500).json({ error: error.message || 'Failed to generate rubric feedback' });
+  }
+});
+
+// Get existing rubric feedback (most recent)
+router.get('/:id/feedback', async (req, res) => {
+  console.log(`[RUBRIC FEEDBACK] GET /${req.params.id}/feedback - Fetching existing feedback`);
+  try {
+    const feedback = await prisma.rubricFeedback.findFirst({
+      where: { rubricId: req.params.id },
+      orderBy: { generatedAt: 'desc' }
+    });
+
+    if (!feedback) {
+      return res.status(404).json({ error: 'No feedback found for this rubric' });
+    }
+
+    res.json({
+      id: feedback.id,
+      rubricId: feedback.rubricId,
+      feedback: feedback.feedback,
+      generatedAt: feedback.generatedAt.toISOString()
+    });
+  } catch (error) {
+    console.error('[RUBRIC FEEDBACK] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch rubric feedback' });
+  }
+});
+
+// Get all feedback history for a rubric
+router.get('/:id/feedback/history', async (req, res) => {
+  console.log(`[RUBRIC FEEDBACK] GET /${req.params.id}/feedback/history`);
+  try {
+    const feedbackHistory = await prisma.rubricFeedback.findMany({
+      where: { rubricId: req.params.id },
+      orderBy: { generatedAt: 'desc' }
+    });
+
+    res.json(feedbackHistory.map(f => ({
+      id: f.id,
+      rubricId: f.rubricId,
+      feedback: f.feedback,
+      generatedAt: f.generatedAt.toISOString()
+    })));
+  } catch (error) {
+    console.error('[RUBRIC FEEDBACK] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch feedback history' });
   }
 });
 
