@@ -43,6 +43,17 @@ model Rubric {
 
   criteria    Criterion[]
   assignments Assignment[]
+  aiFeedback  RubricFeedback[]
+}
+
+// AI-generated feedback on rubric quality
+model RubricFeedback {
+  id          String   @id @default(uuid())
+  feedback    String   // The AI-generated feedback (markdown)
+  generatedAt DateTime @default(now())
+
+  rubricId String
+  rubric   Rubric @relation(fields: [rubricId], references: [id], onDelete: Cascade)
 }
 
 model Criterion {

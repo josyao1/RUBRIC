@@ -129,6 +129,36 @@ export const rubricsApi = {
     fetchApi<Rubric>(`/rubrics/${id}/parse`, {
       method: 'POST',
     }),
+
+  // Get existing AI feedback on rubric (most recent)
+  getExistingFeedback: (id: string) =>
+    fetchApi<{
+      id: string;
+      rubricId: string;
+      feedback: string;
+      generatedAt: string;
+    }>(`/rubrics/${id}/feedback`),
+
+  // Generate new AI feedback on rubric quality
+  generateFeedback: (id: string) =>
+    fetchApi<{
+      id: string;
+      rubricId: string;
+      rubricName: string;
+      feedback: string;
+      generatedAt: string;
+    }>(`/rubrics/${id}/feedback`, {
+      method: 'POST',
+    }),
+
+  // Get feedback history for a rubric
+  getFeedbackHistory: (id: string) =>
+    fetchApi<Array<{
+      id: string;
+      rubricId: string;
+      feedback: string;
+      generatedAt: string;
+    }>>(`/rubrics/${id}/feedback/history`),
 };
 
 // ============================================================================

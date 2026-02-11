@@ -509,6 +509,190 @@ router.get('/:id/file', async (req, res) => {
   }
 });
 
+// Get AI feedback on rubric quality
+router.post('/:id/feedback', async (req, res) => {
+  console.log(`[RUBRIC FEEDBACK] POST /${req.params.id}/feedback - Generating feedback`);
+  try {
+    const rubric = await prisma.rubric.findUnique({
+      where: { id: req.params.id },
+      include: {
+        criteria: {
+          include: {
+            levels: { orderBy: { sortOrder: 'asc' } }
+          },
+          orderBy: { sortOrder: 'asc' }
+        }
+      }
+    });
+
+    if (!rubric) {
+      return res.status(404).json({ error: 'Rubric not found' });
+    }
+
+    if (!rubric.criteria || rubric.criteria.length === 0) {
+      return res.status(400).json({ error: 'Rubric has no criteria to analyze' });
+    }
+
+    // Build rubric text representation for the AI
+    let rubricText = `Rubric: ${rubric.name}\n`;
+    if (rubric.description) rubricText += `Description: ${rubric.description}\n`;
+    rubricText += '\nCriteria:\n';
+
+    for (const criterion of rubric.criteria) {
+      rubricText += `\n## ${criterion.name}\n`;
+      if (criterion.description) rubricText += `Description: ${criterion.description}\n`;
+
+      if (criterion.levels && criterion.levels.length > 0) {
+        rubricText += 'Performance Levels:\n';
+        for (const level of criterion.levels) {
+          rubricText += `  - ${level.label}: ${level.description}\n`;
+        }
+      }
+    }
+
+    console.log(`[RUBRIC FEEDBACK] Analyzing rubric with ${rubric.criteria.length} criteria`);
+
+    // Import Gemini
+    const { GoogleGenAI } = await import('@google/genai');
+    const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+
+    // Research-informed prompt based on AACU VALUE Rubrics and equity-centered rubric design principles
+    const systemPrompt = `You are an expert in educational assessment and rubric design, drawing on research from the AACU VALUE Rubrics and equity-centered pedagogy.
+
+Analyze the provided rubric and give the teacher actionable feedback to improve it. Structure your response with these sections:
+
+## Overall Assessment
+A 2-3 sentence summary of the rubric's current strengths and primary areas for improvement.
+
+## Transparency & Clarity
+Evaluate whether the rubric clearly communicates expectations:
+- Are criteria specific enough that students understand exactly what is expected?
+- Is the language accessible, or does it use jargon that might confuse students?
+- Would a student reading this know precisely how their work will be evaluated?
+
+## Quality Progression Between Levels
+Analyze the performance level descriptions:
+- Do they clearly show what distinguishes each level from adjacent ones?
+- Can a student understand HOW to move from "Developing" to "Proficient" or from "Good" to "Excellent"?
+- Are the differences between levels meaningful and observable, not just degree words ("somewhat", "very")?
+
+## Learning-Focused vs. Scoring-Focused
+Assess whether this rubric functions as a growth tool:
+- Does it emphasize skills and competencies students should develop?
+- Could it be used for self-assessment and reflection, not just grading?
+- Does it support feedback conversations or just assign scores?
+
+## Equity & Accessibility
+Consider whether the rubric is rigorous yet equitable:
+- Are criteria culturally responsive and not biased toward particular backgrounds?
+- Is rigor achieved through clear expectations rather than hidden standards?
+- Would diverse students have equal opportunity to demonstrate mastery?
+
+## Opportunities for Co-Creation
+Suggest how students could be involved:
+- Which criteria or level descriptions could be refined WITH students?
+- How might student input increase ownership and reduce grading disputes?
+- Are there places where student voice would strengthen the rubric?
+
+## Specific Recommendations
+Provide 3-5 concrete, actionable improvements. For each:
+- Quote the specific text that needs revision (if applicable)
+- Explain WHY it should change
+- Offer a revised version or specific suggestion
+
+FORMAT GUIDELINES:
+- Be constructive and collegial—you're helping a fellow educator improve their practice
+- Give specific examples, not vague generalities
+- When suggesting rewrites, show before/after
+- Prioritize the most impactful changes first
+- Keep total response under 800 words for readability`;
+
+    const response = await genAI.models.generateContent({
+      model: 'gemini-2.5-flash-lite',
+      contents: [{ role: 'user', parts: [{ text: rubricText }] }],
+      config: {
+        systemInstruction: systemPrompt
+      }
+    });
+
+    const feedbackText = response.text || 'Unable to generate feedback. Please try again.';
+
+    console.log(`[RUBRIC FEEDBACK] Generated ${feedbackText.length} chars of feedback`);
+
+    // Save feedback to database
+    const savedFeedback = await prisma.rubricFeedback.create({
+      data: {
+        rubricId: rubric.id,
+        feedback: feedbackText
+      }
+    });
+
+    console.log(`[RUBRIC FEEDBACK] Saved feedback with ID: ${savedFeedback.id}`);
+
+    res.json({
+      id: savedFeedback.id,
+      rubricId: rubric.id,
+      rubricName: rubric.name,
+      feedback: feedbackText,
+      generatedAt: savedFeedback.generatedAt.toISOString()
+    });
+  } catch (error: any) {
+    console.error('[RUBRIC FEEDBACK] Error:', error);
+
+    if (error?.status === 429) {
+      return res.status(429).json({ error: 'AI rate limit reached. Please try again in a moment.' });
+    }
+
+    res.status(500).json({ error: error.message || 'Failed to generate rubric feedback' });
+  }
+});
+
+// Get existing rubric feedback (most recent)
+router.get('/:id/feedback', async (req, res) => {
+  console.log(`[RUBRIC FEEDBACK] GET /${req.params.id}/feedback - Fetching existing feedback`);
+  try {
+    const feedback = await prisma.rubricFeedback.findFirst({
+      where: { rubricId: req.params.id },
+      orderBy: { generatedAt: 'desc' }
+    });
+
+    if (!feedback) {
+      return res.status(404).json({ error: 'No feedback found for this rubric' });
+    }
+
+    res.json({
+      id: feedback.id,
+      rubricId: feedback.rubricId,
+      feedback: feedback.feedback,
+      generatedAt: feedback.generatedAt.toISOString()
+    });
+  } catch (error) {
+    console.error('[RUBRIC FEEDBACK] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch rubric feedback' });
+  }
+});
+
+// Get all feedback history for a rubric
+router.get('/:id/feedback/history', async (req, res) => {
+  console.log(`[RUBRIC FEEDBACK] GET /${req.params.id}/feedback/history`);
+  try {
+    const feedbackHistory = await prisma.rubricFeedback.findMany({
+      where: { rubricId: req.params.id },
+      orderBy: { generatedAt: 'desc' }
+    });
+
+    res.json(feedbackHistory.map(f => ({
+      id: f.id,
+      rubricId: f.rubricId,
+      feedback: f.feedback,
+      generatedAt: f.generatedAt.toISOString()
+    })));
+  } catch (error) {
+    console.error('[RUBRIC FEEDBACK] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch feedback history' });
+  }
+});
+
 // Delete rubric
 router.delete('/:id', async (req, res) => {
   try {
