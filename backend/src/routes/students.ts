@@ -6,6 +6,7 @@ import multer from 'multer';
 import { GoogleGenAI } from '@google/genai';
 import prisma from '../db/prisma.js';
 import { extractTextFromFile } from '../services/textExtraction.js';
+import { sendFeedbackEmail } from '../services/emailService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -187,14 +188,24 @@ router.post('/link-submission', async (req, res) => {
 router.post('/release-feedback', async (req, res) => {
   console.log('[STUDENTS] POST /release-feedback');
   try {
-    const { assignmentId, sendEmail } = req.body;
+    const { assignmentId, sendEmail, baseUrl, reRelease } = req.body;
+
+    console.log(`[STUDENTS] Release options: sendEmail=${sendEmail}, reRelease=${reRelease}`);
+
+    // Get assignment name for email
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      select: { name: true }
+    });
 
     // Get all submissions for this assignment that have students linked
+    // If reRelease is true, include already-released submissions
     const submissions = await prisma.submission.findMany({
       where: {
         assignmentId,
         studentId: { not: null },
-        status: 'ready' // Only release if feedback is ready
+        status: { in: ['ready', 'reviewed'] }, // Include reviewed status
+        ...(reRelease ? {} : { feedbackReleased: { not: true } }) // Skip already released unless reRelease
       },
       include: { student: true }
     });
@@ -207,11 +218,17 @@ router.post('/release-feedback', async (req, res) => {
 
     const released = [];
     const errors = [];
+    const emailResults = { sent: 0, failed: [] as { email: string; error: string }[] };
+
+    // Determine base URL for feedback links
+    const feedbackBaseUrl = baseUrl || 'http://localhost:5173';
 
     for (const submission of submissions) {
       try {
         // Generate token if not exists
         let token = submission.feedbackToken;
+        const isReRelease = !!token && submission.feedbackReleased;
+
         if (!token) {
           token = generateToken();
         }
@@ -224,7 +241,9 @@ router.post('/release-feedback', async (req, res) => {
           }
         });
 
-        const feedbackUrl = `/feedback/${token}`;
+        const feedbackUrl = `${feedbackBaseUrl}/feedback/${token}`;
+
+        console.log(`[STUDENTS] ${isReRelease ? 'Re-released' : 'Released'} feedback for ${submission.student?.name} (${submission.student?.email || 'no email'})`);
 
         released.push({
           submissionId: submission.id,
@@ -234,10 +253,23 @@ router.post('/release-feedback', async (req, res) => {
           token
         });
 
-        // TODO: Send email if sendEmail is true
-        // For now, just log
+        // Send email if requested and student has email
         if (sendEmail && submission.student?.email) {
-          console.log(`[EMAIL] Would send to ${submission.student.email}: ${feedbackUrl}`);
+          const emailResult = await sendFeedbackEmail({
+            to: submission.student.email,
+            studentName: submission.student.name,
+            assignmentName: assignment?.name || 'Assignment',
+            feedbackUrl
+          });
+
+          if (emailResult.success) {
+            emailResults.sent++;
+          } else {
+            emailResults.failed.push({
+              email: submission.student.email,
+              error: emailResult.error || 'Unknown error'
+            });
+          }
         }
       } catch (err) {
         errors.push({ submissionId: submission.id, error: String(err) });
@@ -245,7 +277,11 @@ router.post('/release-feedback', async (req, res) => {
     }
 
     console.log(`[STUDENTS] Released ${released.length} feedbacks`);
-    res.json({ released, errors });
+    if (sendEmail) {
+      console.log(`[STUDENTS] Emails: ${emailResults.sent} sent, ${emailResults.failed.length} failed`);
+    }
+
+    res.json({ released, errors, emailResults: sendEmail ? emailResults : undefined });
   } catch (error) {
     console.error('[STUDENTS] Error:', error);
     res.status(500).json({ error: 'Failed to release feedback' });
