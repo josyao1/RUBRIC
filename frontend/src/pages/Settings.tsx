@@ -48,10 +48,10 @@ export default function Settings() {
 
       <div className="max-w-2xl space-y-6">
         {/* Teacher Profile */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-indigo-100 rounded-lg">
-              <User className="w-5 h-5 text-indigo-600" />
+            <div className="p-2 bg-forest-100 rounded-lg">
+              <User className="w-5 h-5 text-forest-600" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Teacher Profile</h2>
@@ -67,7 +67,7 @@ export default function Settings() {
                 value={teacherName}
                 onChange={(e) => setTeacherName(e.target.value)}
                 placeholder="Dr. Smith"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500"
               />
               <p className="text-xs text-gray-500 mt-1">This will appear on student feedback pages</p>
             </div>
@@ -78,17 +78,17 @@ export default function Settings() {
                 value={institution}
                 onChange={(e) => setInstitution(e.target.value)}
                 placeholder="Springfield High School"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500"
               />
             </div>
           </div>
         </div>
 
         {/* Feedback Preferences */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-indigo-100 rounded-lg">
-              <MessageSquare className="w-5 h-5 text-indigo-600" />
+            <div className="p-2 bg-forest-100 rounded-lg">
+              <MessageSquare className="w-5 h-5 text-forest-600" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Feedback Preferences</h2>
@@ -102,7 +102,7 @@ export default function Settings() {
               <select
                 value={feedbackTone}
                 onChange={(e) => setFeedbackTone(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500"
               >
                 <option value="encouraging">Encouraging - Focus on growth and positives</option>
                 <option value="balanced">Balanced - Mix of praise and constructive criticism</option>
@@ -118,7 +118,7 @@ export default function Settings() {
                 value={defaultInstructions}
                 onChange={(e) => setDefaultInstructions(e.target.value)}
                 placeholder="Add any default instructions that should apply to all feedback generation...&#10;&#10;Example: Focus on thesis clarity and evidence quality. Be encouraging with first-year students."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 h-24 resize-none text-sm"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 h-24 resize-none text-sm"
               />
               <p className="text-xs text-gray-500 mt-1">
                 These will be pre-filled when generating feedback (can be edited per assignment)
@@ -128,10 +128,10 @@ export default function Settings() {
         </div>
 
         {/* Student Portal */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-indigo-100 rounded-lg">
-              <Palette className="w-5 h-5 text-indigo-600" />
+            <div className="p-2 bg-forest-100 rounded-lg">
+              <Palette className="w-5 h-5 text-forest-600" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Student Portal</h2>
@@ -148,17 +148,17 @@ export default function Settings() {
                 value={portalWelcome}
                 onChange={(e) => setPortalWelcome(e.target.value)}
                 placeholder="Message shown at the top of student feedback pages..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 h-20 resize-none text-sm"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 h-20 resize-none text-sm"
               />
             </div>
           </div>
         </div>
 
         {/* Data Management */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-indigo-100 rounded-lg">
-              <Database className="w-5 h-5 text-indigo-600" />
+            <div className="p-2 bg-forest-100 rounded-lg">
+              <Database className="w-5 h-5 text-forest-600" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Data Management</h2>
@@ -192,7 +192,7 @@ export default function Settings() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            className="flex items-center px-6 py-3 bg-forest-600 text-white rounded-lg hover:bg-forest-700 disabled:opacity-50"
           >
             {saving ? (
               <>

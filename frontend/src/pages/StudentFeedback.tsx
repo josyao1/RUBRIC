@@ -220,9 +220,9 @@ export default function StudentFeedback() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-10 h-10 animate-spin text-indigo-600 mx-auto" />
+          <Loader2 className="w-10 h-10 animate-spin text-forest-600 mx-auto" />
           <p className="mt-4 text-gray-600">Loading your feedback...</p>
         </div>
       </div>
@@ -231,8 +231,8 @@ export default function StudentFeedback() {
 
   if (error || !feedback) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white rounded-xl p-8 max-w-md text-center shadow-lg">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <div className="bg-white rounded-lg p-8 max-w-md text-center shadow-lg">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h1 className="text-xl font-bold text-gray-900 mb-2">Feedback Not Found</h1>
           <p className="text-gray-600">{error || 'This feedback link may be invalid or expired.'}</p>
@@ -242,17 +242,17 @@ export default function StudentFeedback() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       {/* Header */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-4 py-6">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-indigo-100 rounded-lg">
-              <MessageSquare className="w-6 h-6 text-indigo-600" />
+            <div className="p-2 bg-forest-100 rounded-lg">
+              <MessageSquare className="w-6 h-6 text-forest-600" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Your Feedback</h1>
-              <p className="text-gray-600">from FeedbackLab</p>
+              <h1 className="text-2xl font-serif font-semibold text-gray-900">Your Feedback</h1>
+              <p className="text-gray-500">from FeedbackLab</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-4 mt-4 text-sm">
@@ -286,7 +286,7 @@ export default function StudentFeedback() {
               onClick={() => setActiveTab('overall')}
               className={`px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 activeTab === 'overall'
-                  ? 'border-indigo-600 text-indigo-600'
+                  ? 'border-forest-600 text-forest-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -297,7 +297,7 @@ export default function StudentFeedback() {
               onClick={() => setActiveTab('criteria')}
               className={`px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 activeTab === 'criteria'
-                  ? 'border-indigo-600 text-indigo-600'
+                  ? 'border-forest-600 text-forest-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -308,7 +308,7 @@ export default function StudentFeedback() {
               onClick={() => setActiveTab('document')}
               className={`px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 activeTab === 'document'
-                  ? 'border-indigo-600 text-indigo-600'
+                  ? 'border-forest-600 text-forest-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -324,15 +324,15 @@ export default function StudentFeedback() {
         {activeTab === 'overall' && feedback.overallFeedback && (
           <div className="space-y-6">
             {/* Summary */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <h2 className="text-lg font-semibold text-gray-900 mb-3">Summary</h2>
-                  <p className="text-gray-700 leading-relaxed">{feedback.overallFeedback.summary}</p>
+                  <p className="text-gray-700 leading-relaxed font-serif">{feedback.overallFeedback.summary}</p>
                 </div>
                 <button
                   onClick={() => askAboutOverall('summary', feedback.overallFeedback!.summary)}
-                  className="flex-shrink-0 flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-2 py-1 rounded"
+                  className="flex-shrink-0 flex items-center gap-1 text-xs text-forest-600 hover:text-forest-700 hover:bg-forest-50 px-2 py-1 rounded"
                 >
                   <Bot className="w-3 h-3" />
                   Ask about this
@@ -342,18 +342,18 @@ export default function StudentFeedback() {
 
             {/* What You Did Well */}
             {feedback.overallFeedback.encouragement && (
-              <div className="bg-green-50 rounded-xl border border-green-200 p-6">
+              <div className="bg-green-50 rounded-lg border border-green-200 p-6">
                 <h2 className="text-lg font-semibold text-green-900 mb-3 flex items-center gap-2">
                   <CheckCircle className="w-5 h-5" />
                   What You Did Well
                 </h2>
-                <p className="text-gray-700 leading-relaxed">{feedback.overallFeedback.encouragement}</p>
+                <p className="text-gray-700 leading-relaxed font-serif">{feedback.overallFeedback.encouragement}</p>
               </div>
             )}
 
             {/* Priority Improvements */}
             {parseJsonArray(feedback.overallFeedback.priorityImprovements).length > 0 && (
-              <div className="bg-amber-50 rounded-xl border border-amber-200 p-6">
+              <div className="bg-amber-50 rounded-lg border border-amber-200 p-6">
                 <div className="flex items-start justify-between gap-4 mb-4">
                   <h2 className="text-lg font-semibold text-amber-900 flex items-center gap-2">
                     <TrendingUp className="w-5 h-5" />
@@ -382,7 +382,7 @@ export default function StudentFeedback() {
 
             {/* Next Steps */}
             {parseJsonArray(feedback.overallFeedback.nextSteps).length > 0 && (
-              <div className="bg-blue-50 rounded-xl border border-blue-200 p-6">
+              <div className="bg-blue-50 rounded-lg border border-blue-200 p-6">
                 <div className="flex items-start justify-between gap-4 mb-4">
                   <h2 className="text-lg font-semibold text-blue-900 flex items-center gap-2">
                     <Lightbulb className="w-5 h-5" />
@@ -418,7 +418,7 @@ export default function StudentFeedback() {
               const suggestions = parseJsonArray(section.suggestions);
 
               return (
-                <div key={section.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div key={section.id} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                   <button
                     onClick={() => toggleSection(section.id)}
                     className="w-full flex items-center justify-between p-4 hover:bg-gray-50 text-left"
@@ -519,7 +519,7 @@ export default function StudentFeedback() {
         )}
 
         {activeTab === 'document' && (
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Your Submission with Comments</h2>
             {!feedback.extractedText ? (
               <p className="text-gray-500">No document text available.</p>
@@ -578,7 +578,7 @@ export default function StudentFeedback() {
 
       {/* Resubmission Section */}
       <div className="max-w-5xl mx-auto px-4 pb-8">
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <button
             onClick={() => setResubmitOpen(!resubmitOpen)}
             className="w-full flex items-center justify-between p-4 hover:bg-gray-50 text-left"
@@ -619,7 +619,7 @@ export default function StudentFeedback() {
                   {/* Drop zone */}
                   <div
                     className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                      dragActive ? 'border-indigo-400 bg-indigo-50' : 'border-gray-300 bg-gray-50'
+                      dragActive ? 'border-forest-400 bg-forest-50' : 'border-gray-300 bg-gray-50'
                     }`}
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
@@ -628,7 +628,7 @@ export default function StudentFeedback() {
                     <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
                     <p className="text-sm text-gray-600 mb-1">
                       Drag and drop your file here, or{' '}
-                      <label className="text-indigo-600 hover:text-indigo-700 cursor-pointer underline">
+                      <label className="text-forest-600 hover:text-forest-700 cursor-pointer underline">
                         browse
                         <input
                           type="file"
@@ -665,7 +665,7 @@ export default function StudentFeedback() {
                   <button
                     onClick={handleResubmit}
                     disabled={!resubmitFile || resubmitLoading}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {resubmitLoading ? (
                       <>
@@ -702,7 +702,7 @@ export default function StudentFeedback() {
       {!chatOpen && (
         <button
           onClick={() => setChatOpen(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg flex items-center justify-center z-50 transition-transform hover:scale-105"
+          className="fixed bottom-6 right-6 w-14 h-14 bg-forest-600 hover:bg-forest-700 text-white rounded-full shadow-lg flex items-center justify-center z-50 transition-transform hover:scale-105"
           title="Ask about your feedback"
         >
           <Bot className="w-6 h-6" />
@@ -711,14 +711,14 @@ export default function StudentFeedback() {
 
       {/* Chat Panel */}
       {chatOpen && (
-        <div className="fixed bottom-6 right-6 w-96 h-[32rem] max-h-[80vh] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col z-50">
+        <div className="fixed bottom-6 right-6 w-96 h-[32rem] max-h-[80vh] bg-white rounded-xl shadow-2xl border border-gray-200 flex flex-col z-50">
           {/* Header */}
-          <div className="bg-indigo-600 text-white px-4 py-3 rounded-t-2xl flex items-center gap-3">
+          <div className="bg-sidebar text-white px-4 py-3 rounded-t-xl flex items-center gap-3">
             <Bot className="w-5 h-5" />
             <span className="font-medium flex-1">Ask About Your Feedback</span>
             <button
               onClick={() => setChatOpen(false)}
-              className="p-1 hover:bg-indigo-500 rounded"
+              className="p-1 hover:bg-white/10 rounded"
             >
               <X className="w-4 h-4" />
             </button>
@@ -741,12 +741,12 @@ export default function StudentFeedback() {
                 <div
                   className={`max-w-[80%] rounded-lg p-3 text-sm ${
                     msg.role === 'user'
-                      ? 'bg-indigo-100 text-gray-800'
+                      ? 'bg-forest-100 text-gray-800'
                       : 'bg-gray-100 text-gray-800'
                   }`}
                 >
                   {msg.role === 'assistant' && (
-                    <Bot className="w-4 h-4 text-indigo-500 mb-1" />
+                    <Bot className="w-4 h-4 text-forest-500 mb-1" />
                   )}
                   <p className="whitespace-pre-wrap">{msg.content}</p>
                 </div>
@@ -788,13 +788,13 @@ export default function StudentFeedback() {
                   }
                 }}
                 placeholder="Ask about your feedback..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-forest-500 focus:border-forest-500"
                 disabled={chatLoading}
               />
               <button
                 onClick={() => sendChatMessage()}
                 disabled={!chatInput.trim() || chatLoading}
-                className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send className="w-4 h-4" />
               </button>
