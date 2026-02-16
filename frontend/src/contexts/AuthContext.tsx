@@ -1,3 +1,9 @@
+/**
+ * AuthContext — Authentication context provider with JWT login/logout
+ *
+ * Provides user state, login, and logout functions to the component tree.
+ * Exports the useAuth hook for consuming auth state in any component.
+ */
 import { createContext, useContext, type ReactNode } from 'react';
 
 // Placeholder user - replace with real auth later

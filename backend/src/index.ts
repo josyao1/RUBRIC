@@ -1,3 +1,10 @@
+/**
+ * Server Entry Point — Express application setup and initialization
+ *
+ * Configures middleware (CORS, JSON parsing, request logging), mounts API
+ * route handlers for rubrics, assignments, submissions, and students under
+ * /api/*, ensures upload directories exist, and starts the HTTP server.
+ */
 import express from 'express';
 import cors from 'cors';
 import { fileURLToPath } from 'url';

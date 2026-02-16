@@ -1,3 +1,9 @@
+/**
+ * Settings — User settings page for profile and preferences
+ *
+ * Provides forms for updating user profile information, notification
+ * preferences, and application settings like theme and data management.
+ */
 import { useState } from 'react';
 import { User, MessageSquare, Palette, Database, Save, Loader2, CheckCircle, Trash2, Download } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';

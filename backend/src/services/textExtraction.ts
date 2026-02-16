@@ -1,3 +1,10 @@
+/**
+ * Text Extraction — Extracts plain text from uploaded files
+ *
+ * Supports PDFs (via pdf-parse), Word documents (via mammoth), images
+ * (via Tesseract OCR), and common text-based source files. Exports
+ * extractTextFromFile which dispatches based on file extension.
+ */
 import { readFileSync } from 'fs';
 import { extname } from 'path';
 import { createRequire } from 'module';

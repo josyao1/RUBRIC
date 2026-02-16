@@ -1,3 +1,12 @@
+/**
+ * Feedback Generation — AI-powered rubric feedback for student submissions
+ *
+ * Calls the Gemini API to evaluate each submission against rubric criteria,
+ * producing per-criterion feedback with matched performance levels. Includes
+ * rate-limiting, exponential backoff for 429/503 errors, and sequential
+ * processing. Exports processAssignmentFeedback to grade all submissions
+ * for a given assignment.
+ */
 import { GoogleGenAI } from '@google/genai';
 import prisma from '../db/prisma.js';
 

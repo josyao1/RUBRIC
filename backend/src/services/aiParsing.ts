@@ -1,3 +1,11 @@
+/**
+ * AI Rubric Parsing — Extracts structured rubric criteria from documents
+ *
+ * Uses the Gemini API to parse rubric text or images into structured JSON
+ * (criteria with performance levels). Exports parseRubricWithAI for text
+ * input and parseRubricWithVision for image-based rubrics, along with
+ * ParsedRubric, ParsedCriterion, and ParsedLevel interfaces.
+ */
 import { GoogleGenAI } from '@google/genai';
 import { readFileSync } from 'fs';
 

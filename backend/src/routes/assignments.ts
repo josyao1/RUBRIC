@@ -1,3 +1,10 @@
+/**
+ * Assignment Routes — CRUD and grading endpoints for assignments
+ *
+ * Provides GET/POST/PUT/DELETE for assignment management, plus endpoints
+ * to start AI grading, regrade selected submissions, and poll grading
+ * status. Mounted at /api/assignments.
+ */
 import { Router } from 'express';
 import prisma from '../db/prisma.js';
 import { processAssignmentFeedback } from '../services/feedbackGeneration.js';

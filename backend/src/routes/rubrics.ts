@@ -1,3 +1,11 @@
+/**
+ * Rubric Routes — CRUD, file upload, and AI parsing for rubrics
+ *
+ * Supports creating rubrics manually or by uploading documents (PDF, DOCX,
+ * images) that are parsed into structured criteria via AI. Includes
+ * per-rubric feedback generation/retrieval and feedback history. Also
+ * serves uploaded rubric files. Mounted at /api/rubrics.
+ */
 import { Router } from 'express';
 import multer from 'multer';
 import { fileURLToPath } from 'url';

@@ -1,11 +1,22 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+/**
+ * StudentFeedback — Public student-facing feedback view
+ *
+ * Accessed via magic link token. Displays tabbed feedback with overall summary,
+ * per-criteria scores, and a highlighted document view with inline comments.
+ * Includes a ChatPanel for asking questions and a ResubmitPanel for revisions.
+ */
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   MessageSquare, CheckCircle, TrendingUp, Lightbulb,
   ChevronDown, ChevronRight, Loader2, AlertCircle, FileText,
-  Send, Bot, X, Upload, Trash2
+  Bot
 } from 'lucide-react';
 import { studentsApi, type SubmissionWithFeedback } from '../services/api';
+import { parseJsonArray } from '../utils/parseJsonArray';
+import HighlightedDocument from '../components/HighlightedDocument';
+import ChatPanel, { type ChatPanelHandle } from '../components/ChatPanel';
+import ResubmitPanel from '../components/ResubmitPanel';
 
 interface FeedbackData extends SubmissionWithFeedback {
   studentName?: string;
@@ -21,32 +32,14 @@ export default function StudentFeedback() {
   const [activeTab, setActiveTab] = useState<'document' | 'criteria' | 'overall'>('overall');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
-  // Chat state
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState<{ role: string; content: string }[]>([]);
-  const [chatInput, setChatInput] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
-  const [chatError, setChatError] = useState<string | null>(null);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  // Resubmission state
-  const [resubmitOpen, setResubmitOpen] = useState(false);
-  const [resubmitFile, setResubmitFile] = useState<File | null>(null);
-  const [resubmitLoading, setResubmitLoading] = useState(false);
-  const [resubmitSuccess, setResubmitSuccess] = useState(false);
-  const [resubmitError, setResubmitError] = useState<string | null>(null);
-  const [dragActive, setDragActive] = useState(false);
+  // Chat ref
+  const chatRef = useRef<ChatPanelHandle>(null);
 
   useEffect(() => {
     if (token) {
       loadFeedback();
     }
   }, [token]);
-
-  // Auto-scroll chat to bottom
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages, chatLoading]);
 
   const loadFeedback = async () => {
     try {
@@ -73,90 +66,25 @@ export default function StudentFeedback() {
     });
   };
 
-  const parseJsonArray = (str: string): string[] => {
-    try { return JSON.parse(str); }
-    catch { return []; }
-  };
 
-  // Chat handler
-  const sendChatMessage = async (messageOverride?: string) => {
-    const messageToSend = messageOverride || chatInput.trim();
-    if (!messageToSend || chatLoading || !token) return;
-
-    if (!messageOverride) setChatInput('');
-    setChatError(null);
-
-    const newMessages = [...chatMessages, { role: 'user', content: messageToSend }];
-    setChatMessages(newMessages);
-    setChatLoading(true);
-
-    // Open chat if it's not already open
-    if (!chatOpen) setChatOpen(true);
-
-    try {
-      const result = await studentsApi.chatAboutFeedback(token, messageToSend, chatMessages);
-      setChatMessages(prev => [...prev, { role: 'assistant', content: result.response }]);
-    } catch (err) {
-      setChatError(err instanceof Error ? err.message : 'Failed to get response');
-    } finally {
-      setChatLoading(false);
-    }
-  };
-
-  // Ask about specific feedback
+  // Ask about specific feedback (via chat ref)
   const askAboutInlineComment = (comment: { highlightedText: string; comment: string; criterion?: { name: string } }) => {
     const criterionPart = comment.criterion ? ` (${comment.criterion.name})` : '';
     const message = `Can you explain this comment${criterionPart}? The highlighted text was: "${comment.highlightedText}" and the feedback was: "${comment.comment}"`;
-    sendChatMessage(message);
+    chatRef.current?.sendMessage(message);
   };
 
   const askAboutCriterion = (criterionName: string, type: 'strengths' | 'growth' | 'suggestions', items: string[]) => {
     const typeLabel = type === 'strengths' ? 'strengths' : type === 'growth' ? 'areas for growth' : 'suggestions';
     const message = `Can you explain more about the ${typeLabel} for "${criterionName}"? The feedback mentioned: ${items.join('; ')}`;
-    sendChatMessage(message);
+    chatRef.current?.sendMessage(message);
   };
 
   const askAboutOverall = (section: 'summary' | 'improvements' | 'nextSteps', content: string | string[]) => {
     const contentStr = Array.isArray(content) ? content.join('; ') : content;
     const sectionLabel = section === 'summary' ? 'summary' : section === 'improvements' ? 'priority improvements' : 'next steps';
     const message = `Can you explain more about the ${sectionLabel}? It said: "${contentStr}"`;
-    sendChatMessage(message);
-  };
-
-  // Resubmit handlers
-  const handleResubmit = async () => {
-    if (!resubmitFile || !token) return;
-    setResubmitLoading(true);
-    setResubmitError(null);
-    try {
-      await studentsApi.resubmit(token, resubmitFile);
-      setResubmitSuccess(true);
-      setResubmitFile(null);
-    } catch (err) {
-      setResubmitError(err instanceof Error ? err.message : 'Failed to submit revision');
-    } finally {
-      setResubmitLoading(false);
-    }
-  };
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragActive(true);
-  }, []);
-
-  const handleDragLeave = useCallback(() => setDragActive(false), []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragActive(false);
-    const file = e.dataTransfer.files[0];
-    if (file) setResubmitFile(file);
-  }, []);
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    chatRef.current?.sendMessage(message);
   };
 
   const sortedComments = useMemo(() => {
@@ -164,59 +92,6 @@ export default function StudentFeedback() {
     return [...feedback.inlineComments].sort((a, b) => a.startPosition - b.startPosition);
   }, [feedback]);
 
-  // Render text with highlights (same as teacher view)
-  const renderHighlightedText = () => {
-    if (!feedback?.extractedText) return null;
-
-    const text = feedback.extractedText;
-    const comments = sortedComments;
-
-    if (comments.length === 0) {
-      return <pre className="whitespace-pre-wrap text-sm text-gray-700 font-sans">{text}</pre>;
-    }
-
-    const segments: React.ReactNode[] = [];
-    let lastEnd = 0;
-
-    comments.forEach((comment, idx) => {
-      // Add text before this highlight
-      if (comment.startPosition > lastEnd) {
-        segments.push(
-          <span key={`text-${idx}`}>
-            {text.slice(lastEnd, comment.startPosition)}
-          </span>
-        );
-      }
-
-      // Add highlighted text
-      segments.push(
-        <span
-          key={`highlight-${idx}`}
-          className="bg-yellow-200 hover:bg-yellow-300 cursor-pointer relative group"
-          title={comment.comment}
-        >
-          {text.slice(comment.startPosition, comment.endPosition)}
-          <span className="absolute bottom-full left-0 mb-1 hidden group-hover:block bg-gray-900 text-white text-xs p-2 rounded shadow-lg max-w-xs z-10">
-            {comment.criterion && (
-              <span className="text-yellow-300 font-medium block mb-1">
-                {comment.criterion.name}
-              </span>
-            )}
-            {comment.comment}
-          </span>
-        </span>
-      );
-
-      lastEnd = comment.endPosition;
-    });
-
-    // Add remaining text
-    if (lastEnd < text.length) {
-      segments.push(<span key="text-end">{text.slice(lastEnd)}</span>);
-    }
-
-    return <pre className="whitespace-pre-wrap text-sm text-gray-700 font-sans">{segments}</pre>;
-  };
 
   if (loading) {
     return (
@@ -527,7 +402,7 @@ export default function StudentFeedback() {
               <div className="flex gap-4">
                 {/* Document with highlights */}
                 <div className={`bg-gray-50 rounded-lg p-4 overflow-auto ${sortedComments.length > 0 ? 'flex-1' : 'w-full'}`} style={{ maxHeight: '60vh' }}>
-                  {renderHighlightedText()}
+                  <HighlightedDocument text={feedback.extractedText} comments={sortedComments} />
                 </div>
 
                 {/* Comments sidebar */}
@@ -577,119 +452,7 @@ export default function StudentFeedback() {
       </main>
 
       {/* Resubmission Section */}
-      <div className="max-w-5xl mx-auto px-4 pb-8">
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <button
-            onClick={() => setResubmitOpen(!resubmitOpen)}
-            className="w-full flex items-center justify-between p-4 hover:bg-gray-50 text-left"
-          >
-            <div className="flex items-center gap-2 text-gray-700">
-              <Upload className="w-5 h-5" />
-              <span className="font-medium">Submit a Revision</span>
-            </div>
-            {resubmitOpen ? (
-              <ChevronDown className="w-5 h-5 text-gray-400" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-gray-400" />
-            )}
-          </button>
-
-          {resubmitOpen && (
-            <div className="p-6 border-t border-gray-100 space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-sm text-blue-800">
-                  Upload a revised version of your work. Your instructor will review it and may provide updated feedback.
-                </p>
-              </div>
-
-              {resubmitSuccess ? (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-                  <CheckCircle className="w-10 h-10 text-green-500 mx-auto mb-3" />
-                  <h3 className="font-semibold text-green-900 mb-1">Revision Submitted Successfully</h3>
-                  <p className="text-sm text-green-700 mb-4">Your instructor will review your revision and provide updated feedback.</p>
-                  <button
-                    onClick={() => setResubmitSuccess(false)}
-                    className="text-sm text-green-700 hover:text-green-800 underline"
-                  >
-                    Submit Another Revision
-                  </button>
-                </div>
-              ) : (
-                <>
-                  {/* Drop zone */}
-                  <div
-                    className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                      dragActive ? 'border-forest-400 bg-forest-50' : 'border-gray-300 bg-gray-50'
-                    }`}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                  >
-                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600 mb-1">
-                      Drag and drop your file here, or{' '}
-                      <label className="text-forest-600 hover:text-forest-700 cursor-pointer underline">
-                        browse
-                        <input
-                          type="file"
-                          className="hidden"
-                          accept=".pdf,.docx,.doc,.txt,.py,.java,.js,.ts,.cpp,.c,.html,.css,.md,.png,.jpg,.jpeg,.webp"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) setResubmitFile(file);
-                          }}
-                        />
-                      </label>
-                    </p>
-                    <p className="text-xs text-gray-500">PDF, Word, text, code, or image files</p>
-                  </div>
-
-                  {/* File preview */}
-                  {resubmitFile && (
-                    <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-3">
-                      <FileText className="w-5 h-5 text-gray-400" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{resubmitFile.name}</p>
-                        <p className="text-xs text-gray-500">{formatFileSize(resubmitFile.size)}</p>
-                      </div>
-                      <button
-                        onClick={() => setResubmitFile(null)}
-                        className="text-gray-400 hover:text-red-500"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Submit button */}
-                  <button
-                    onClick={handleResubmit}
-                    disabled={!resubmitFile || resubmitLoading}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {resubmitLoading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Submitting...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="w-4 h-4" />
-                        Submit Revision
-                      </>
-                    )}
-                  </button>
-
-                  {/* Error display */}
-                  {resubmitError && (
-                    <p className="text-sm text-red-600 text-center">{resubmitError}</p>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+      <ResubmitPanel token={token!} />
 
       {/* Footer */}
       <footer className="bg-white border-t border-gray-200 mt-12">
@@ -698,110 +461,8 @@ export default function StudentFeedback() {
         </div>
       </footer>
 
-      {/* Floating Chat Button */}
-      {!chatOpen && (
-        <button
-          onClick={() => setChatOpen(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-forest-600 hover:bg-forest-700 text-white rounded-full shadow-lg flex items-center justify-center z-50 transition-transform hover:scale-105"
-          title="Ask about your feedback"
-        >
-          <Bot className="w-6 h-6" />
-        </button>
-      )}
-
-      {/* Chat Panel */}
-      {chatOpen && (
-        <div className="fixed bottom-6 right-6 w-96 h-[32rem] max-h-[80vh] bg-white rounded-xl shadow-2xl border border-gray-200 flex flex-col z-50">
-          {/* Header */}
-          <div className="bg-sidebar text-white px-4 py-3 rounded-t-xl flex items-center gap-3">
-            <Bot className="w-5 h-5" />
-            <span className="font-medium flex-1">Ask About Your Feedback</span>
-            <button
-              onClick={() => setChatOpen(false)}
-              className="p-1 hover:bg-white/10 rounded"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {chatMessages.length === 0 && !chatLoading && (
-              <div className="text-center text-gray-500 text-sm py-8">
-                <Bot className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                <p>Ask me anything about your feedback!</p>
-                <p className="text-xs mt-1">I can help explain comments, suggest improvements, or clarify rubric criteria.</p>
-              </div>
-            )}
-            {chatMessages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[80%] rounded-lg p-3 text-sm ${
-                    msg.role === 'user'
-                      ? 'bg-forest-100 text-gray-800'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}
-                >
-                  {msg.role === 'assistant' && (
-                    <Bot className="w-4 h-4 text-forest-500 mb-1" />
-                  )}
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
-                </div>
-              </div>
-            ))}
-            {chatLoading && (
-              <div className="flex justify-start">
-                <div className="bg-gray-100 rounded-lg p-3 text-sm text-gray-600">
-                  <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
-                  Thinking...
-                </div>
-              </div>
-            )}
-            <div ref={chatEndRef} />
-          </div>
-
-          {/* Error banner */}
-          {chatError && (
-            <div className="mx-4 mb-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 flex items-center gap-2">
-              <AlertCircle className="w-3 h-3 flex-shrink-0" />
-              <span className="flex-1">{chatError}</span>
-              <button onClick={() => setChatError(null)} className="text-red-500 hover:text-red-700">
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          )}
-
-          {/* Input */}
-          <div className="p-3 border-t border-gray-200">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendChatMessage();
-                  }
-                }}
-                placeholder="Ask about your feedback..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-forest-500 focus:border-forest-500"
-                disabled={chatLoading}
-              />
-              <button
-                onClick={() => sendChatMessage()}
-                disabled={!chatInput.trim() || chatLoading}
-                className="p-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Chat */}
+      <ChatPanel ref={chatRef} token={token!} />
     </div>
   );
 }

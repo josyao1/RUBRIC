@@ -1,3 +1,9 @@
+/**
+ * Dashboard — Main dashboard with stats, recent activity, and quick actions
+ *
+ * Displays summary stat cards (assignments, submissions, students, rubrics),
+ * a recent activity feed, and quick-action buttons for common tasks.
+ */
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {

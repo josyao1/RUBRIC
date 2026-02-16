@@ -1,3 +1,9 @@
+/**
+ * Prisma Client Singleton — Database access layer
+ *
+ * Exports a single shared PrismaClient instance using the global-singleton
+ * pattern to prevent multiple connections during hot-reloads in development.
+ */
 import { PrismaClient } from '@prisma/client';
 
 // Singleton pattern for Prisma client

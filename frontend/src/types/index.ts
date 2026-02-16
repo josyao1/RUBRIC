@@ -1,3 +1,9 @@
+/**
+ * types — Shared TypeScript type definitions
+ *
+ * Exports interfaces and types used across the frontend: Criterion, Rubric,
+ * Assignment, Submission, Student, and related domain models.
+ */
 export interface Criterion {
   id: string;
   name: string;

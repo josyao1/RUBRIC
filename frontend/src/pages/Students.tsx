@@ -1,3 +1,10 @@
+/**
+ * Students — Student roster management with feedback release and magic links
+ *
+ * Displays the student list with add/remove/import capabilities. Supports
+ * releasing feedback to individual students and generating magic links
+ * for passwordless access to the student feedback view.
+ */
 import { useState, useEffect, useRef } from 'react';
 import {
   Users, Plus, Upload, Trash2, Loader2, AlertCircle,

@@ -1,9 +1,18 @@
+/**
+ * FeedbackViewer — Modal displaying full feedback for a submission
+ *
+ * Shows inline comments overlaid on the document text, per-criteria feedback
+ * sections with scores, and overall feedback summary. Fetches feedback data
+ * on mount and supports collapsible criteria sections.
+ */
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   X, Loader2, FileText, MessageSquare, CheckCircle,
   TrendingUp, Lightbulb, ChevronDown, ChevronRight, User
 } from 'lucide-react';
 import { submissionsApi, type SubmissionWithFeedback } from '../services/api';
+import { parseJsonArray } from '../utils/parseJsonArray';
+import HighlightedDocument from './HighlightedDocument';
 
 interface FeedbackViewerProps {
   submissionId: string;
@@ -49,14 +58,6 @@ export default function FeedbackViewer({ submissionId, onClose }: FeedbackViewer
     });
   };
 
-  // Parse JSON arrays safely
-  const parseJsonArray = (str: string): string[] => {
-    try {
-      return JSON.parse(str);
-    } catch {
-      return [];
-    }
-  };
 
   // Sort inline comments by position
   const sortedComments = useMemo(() => {
@@ -64,59 +65,6 @@ export default function FeedbackViewer({ submissionId, onClose }: FeedbackViewer
     return [...submission.inlineComments].sort((a, b) => a.startPosition - b.startPosition);
   }, [submission]);
 
-  // Render text with highlights
-  const renderHighlightedText = () => {
-    if (!submission?.extractedText) return null;
-
-    const text = submission.extractedText;
-    const comments = sortedComments;
-
-    if (comments.length === 0) {
-      return <pre className="whitespace-pre-wrap text-sm text-gray-700 font-sans">{text}</pre>;
-    }
-
-    const segments: React.ReactNode[] = [];
-    let lastEnd = 0;
-
-    comments.forEach((comment, idx) => {
-      // Add text before this highlight
-      if (comment.startPosition > lastEnd) {
-        segments.push(
-          <span key={`text-${idx}`}>
-            {text.slice(lastEnd, comment.startPosition)}
-          </span>
-        );
-      }
-
-      // Add highlighted text
-      segments.push(
-        <span
-          key={`highlight-${idx}`}
-          className="bg-yellow-200 hover:bg-yellow-300 cursor-pointer relative group"
-          title={comment.comment}
-        >
-          {text.slice(comment.startPosition, comment.endPosition)}
-          <span className="absolute bottom-full left-0 mb-1 hidden group-hover:block bg-gray-900 text-white text-xs p-2 rounded shadow-lg max-w-xs z-10">
-            {comment.criterion && (
-              <span className="text-yellow-300 font-medium block mb-1">
-                {comment.criterion.name}
-              </span>
-            )}
-            {comment.comment}
-          </span>
-        </span>
-      );
-
-      lastEnd = comment.endPosition;
-    });
-
-    // Add remaining text
-    if (lastEnd < text.length) {
-      segments.push(<span key="text-end">{text.slice(lastEnd)}</span>);
-    }
-
-    return <pre className="whitespace-pre-wrap text-sm text-gray-700 font-sans">{segments}</pre>;
-  };
 
   if (loading) {
     return (
@@ -223,7 +171,7 @@ export default function FeedbackViewer({ submissionId, onClose }: FeedbackViewer
               {/* Document with highlights */}
               <div className={`bg-gray-50 rounded-lg p-4 overflow-auto ${sortedComments.length > 0 ? 'flex-1' : 'w-full'}`} style={{ maxHeight: 'calc(90vh - 200px)' }}>
                 {submission.extractedText ? (
-                  renderHighlightedText()
+                  <HighlightedDocument text={submission.extractedText} comments={sortedComments} />
                 ) : (
                   <p className="text-gray-500 text-sm italic">No text content available</p>
                 )}

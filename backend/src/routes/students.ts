@@ -1,3 +1,11 @@
+/**
+ * Student Routes — Student management, feedback release, and magic links
+ *
+ * CRUD for students, CSV import, linking students to submissions, and
+ * releasing AI feedback via unique magic-link tokens. Also serves the
+ * student-facing feedback view and a conversational chat endpoint for
+ * follow-up questions, plus file resubmission. Mounted at /api/students.
+ */
 import { Router } from 'express';
 import { randomBytes } from 'crypto';
 import { fileURLToPath } from 'url';

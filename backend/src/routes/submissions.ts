@@ -1,3 +1,10 @@
+/**
+ * Submission Routes — CRUD and file upload endpoints for submissions
+ *
+ * Handles bulk file uploads (up to 100 files via multer), automatic text
+ * extraction from uploaded documents, and standard GET/PATCH/DELETE
+ * operations. Mounted at /api/submissions.
+ */
 import { Router } from 'express';
 import multer from 'multer';
 import { fileURLToPath } from 'url';

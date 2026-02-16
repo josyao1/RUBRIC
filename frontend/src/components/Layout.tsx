@@ -1,3 +1,9 @@
+/**
+ * Layout — App shell with dark forest sidebar navigation and content outlet
+ *
+ * Renders the persistent sidebar with nav links, user avatar, and logout.
+ * Child routes are rendered via React Router's Outlet in the main content area.
+ */
 import { NavLink, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard,

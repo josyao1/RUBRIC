@@ -1,3 +1,10 @@
+/**
+ * api — API client with typed methods for all backend endpoints
+ *
+ * Provides namespaced API objects (rubricsApi, assignmentsApi, studentsApi)
+ * with methods for CRUD operations, file uploads, grading, and feedback.
+ * All methods include error handling via a generic fetchApi wrapper.
+ */
 const API_BASE = 'http://localhost:3001/api';
 
 // Generic fetch wrapper with error handling

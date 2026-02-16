@@ -1,3 +1,10 @@
+/**
+ * FeedbackReview — Review and approve AI-generated feedback before release
+ *
+ * Placeholder page that will display a queue of pending AI-generated feedback
+ * for instructor review. Shows stats for pending, released, and student
+ * question counts, with a table for reviewing individual submissions.
+ */
 import { FileText, MessageSquare, Clock, CheckCircle } from 'lucide-react';
 
 export default function FeedbackReview() {
