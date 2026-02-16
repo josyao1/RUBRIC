@@ -21,26 +21,27 @@ export default function Layout() {
   const { user } = useAuth();
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-surface">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+      <aside className="w-64 bg-sidebar flex flex-col">
         {/* Logo */}
-        <div className="h-16 flex items-center px-6 border-b border-gray-200">
-          <MessageSquare className="w-8 h-8 text-indigo-600" />
-          <span className="ml-3 text-xl font-bold text-gray-900">FeedbackLab</span>
+        <div className="h-16 flex items-center px-6 border-b border-white/10">
+          <MessageSquare className="w-7 h-7 text-accent-400" />
+          <span className="ml-3 text-xl font-serif font-semibold text-white/90">FeedbackLab</span>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-1">
+        <nav className="flex-1 px-3 py-6 space-y-1">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
+              end={item.to === '/'}
               className={({ isActive }) =>
-                `flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                `flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
                   isActive
-                    ? 'bg-indigo-50 text-indigo-600'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    ? 'bg-white/10 text-white border-l-2 border-accent-400'
+                    : 'text-white/60 hover:bg-white/5 hover:text-white/80 border-l-2 border-transparent'
                 }`
               }
             >
@@ -51,16 +52,16 @@ export default function Layout() {
         </nav>
 
         {/* User section */}
-        <div className="p-4 border-t border-gray-200">
+        <div className="p-4 border-t border-white/10">
           <div className="flex items-center">
-            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
-              <span className="text-indigo-600 font-medium">
+            <div className="w-9 h-9 rounded-full bg-forest-700 flex items-center justify-center">
+              <span className="text-forest-100 font-medium text-sm">
                 {user?.name?.charAt(0) || 'U'}
               </span>
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-gray-900">{user?.name || 'User'}</p>
-              <p className="text-xs text-gray-500">{user?.email || ''}</p>
+              <p className="text-sm font-medium text-white/90">{user?.name || 'User'}</p>
+              <p className="text-xs text-white/50">{user?.email || ''}</p>
             </div>
           </div>
         </div>

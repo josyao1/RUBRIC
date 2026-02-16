@@ -122,7 +122,7 @@ export default function Students() {
           </button>
           <button
             onClick={() => setShowAddStudent(true)}
-            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+            className="flex items-center px-4 py-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Student
@@ -171,14 +171,14 @@ export default function Students() {
       )}
 
       {/* Release Feedback Button */}
-      <div className="mb-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg flex items-center justify-between">
+      <div className="mb-6 p-4 bg-forest-50 border border-forest-200 rounded-lg flex items-center justify-between">
         <div>
-          <h3 className="font-medium text-indigo-900">Release Feedback to Students</h3>
-          <p className="text-sm text-indigo-700">Generate magic links and optionally email students</p>
+          <h3 className="font-medium text-forest-900">Release Feedback to Students</h3>
+          <p className="text-sm text-forest-700">Generate magic links and optionally email students</p>
         </div>
         <button
           onClick={() => setShowRelease(true)}
-          className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          className="flex items-center px-4 py-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700"
         >
           <Send className="w-4 h-4 mr-2" />
           Release Feedback
@@ -220,14 +220,14 @@ export default function Students() {
       {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-forest-600" />
           <span className="ml-3 text-gray-600">Loading...</span>
         </div>
       )}
 
       {/* Students List */}
       {!loading && students.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
           <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No students yet</h3>
           <p className="text-gray-500 mb-6">Add students manually or import from CSV.</p>
@@ -241,7 +241,7 @@ export default function Students() {
             </button>
             <button
               onClick={() => setShowAddStudent(true)}
-              className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+              className="flex items-center px-4 py-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700"
             >
               <Plus className="w-4 h-4 mr-2" />
               Add Student
@@ -249,7 +249,7 @@ export default function Students() {
           </div>
         </div>
       ) : !loading && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -317,7 +317,7 @@ export default function Students() {
                               className={`flex items-center gap-1 px-2 py-1 text-xs rounded-full transition-colors ${
                                 copiedToken === sub.feedbackToken
                                   ? 'bg-green-100 text-green-700'
-                                  : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                                  : 'bg-forest-100 text-forest-700 hover:bg-forest-200'
                               }`}
                               title={sub.assignment?.name || sub.fileName}
                             >
@@ -331,7 +331,7 @@ export default function Students() {
                               href={`/feedback/${sub.feedbackToken}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-gray-400 hover:text-indigo-600"
+                              className="text-gray-400 hover:text-forest-600"
                               title="Open feedback"
                             >
                               <ExternalLink className="w-3.5 h-3.5" />
@@ -417,7 +417,7 @@ function AddStudentModal({ onClose, onAdd }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl w-full max-w-md mx-4 p-6">
+      <div className="bg-white rounded-lg w-full max-w-md mx-4 p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">Add Student</h2>
         {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
         <div className="space-y-4">
@@ -427,7 +427,7 @@ function AddStudentModal({ onClose, onAdd }: {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500"
               placeholder="John Smith"
             />
           </div>
@@ -437,7 +437,7 @@ function AddStudentModal({ onClose, onAdd }: {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500"
               placeholder="john@school.edu"
             />
           </div>
@@ -447,7 +447,7 @@ function AddStudentModal({ onClose, onAdd }: {
               type="text"
               value={studentId}
               onChange={(e) => setStudentId(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500"
               placeholder="12345"
             />
           </div>
@@ -459,7 +459,7 @@ function AddStudentModal({ onClose, onAdd }: {
           <button
             onClick={handleSubmit}
             disabled={!name.trim() || saving}
-            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            className="flex items-center px-4 py-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700 disabled:opacity-50"
           >
             {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             Add Student
@@ -538,7 +538,7 @@ function ImportModal({ onClose, onImport }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl w-full max-w-lg mx-4 p-6">
+      <div className="bg-white rounded-lg w-full max-w-lg mx-4 p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">Import Students from CSV</h2>
 
         {!result ? (
@@ -557,7 +557,7 @@ function ImportModal({ onClose, onImport }: {
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-500 text-center"
+                className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-forest-500 text-center"
               >
                 <Upload className="w-6 h-6 text-gray-400 mx-auto mb-2" />
                 <span className="text-sm text-gray-600">Click to upload CSV file</span>
@@ -569,7 +569,7 @@ function ImportModal({ onClose, onImport }: {
               <textarea
                 value={csvText}
                 onChange={(e) => setCsvText(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 h-32 font-mono text-sm"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 h-32 font-mono text-sm"
                 placeholder="John Smith,john@school.edu,12345&#10;Jane Doe,jane@school.edu,12346"
               />
             </div>
@@ -581,7 +581,7 @@ function ImportModal({ onClose, onImport }: {
               <button
                 onClick={handleImport}
                 disabled={!csvText.trim() || importing}
-                className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                className="flex items-center px-4 py-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700 disabled:opacity-50"
               >
                 {importing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Import
@@ -614,7 +614,7 @@ function ImportModal({ onClose, onImport }: {
               )}
             </div>
             <div className="flex justify-end">
-              <button onClick={onClose} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+              <button onClick={onClose} className="px-4 py-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700">
                 Done
               </button>
             </div>
@@ -662,7 +662,7 @@ function ReleaseModal({ assignments, onClose, onRelease }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-auto">
+      <div className="bg-white rounded-lg w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-auto">
         <h2 className="text-xl font-bold text-gray-900 mb-4">Release Feedback</h2>
 
         {!result ? (
@@ -676,7 +676,7 @@ function ReleaseModal({ assignments, onClose, onRelease }: {
               <select
                 value={selectedAssignment}
                 onChange={(e) => setSelectedAssignment(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500"
               >
                 <option value="">Select an assignment</option>
                 {readyAssignments.map(a => (
@@ -698,7 +698,7 @@ function ReleaseModal({ assignments, onClose, onRelease }: {
                   type="checkbox"
                   checked={sendEmail}
                   onChange={(e) => setSendEmail(e.target.checked)}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-gray-300 text-forest-600 focus:ring-forest-500"
                 />
                 <span className="text-sm text-gray-700">Send email notifications to students</span>
               </label>
@@ -714,7 +714,7 @@ function ReleaseModal({ assignments, onClose, onRelease }: {
               <button
                 onClick={handleRelease}
                 disabled={!selectedAssignment || releasing}
-                className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                className="flex items-center px-4 py-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700 disabled:opacity-50"
               >
                 {releasing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 <Send className="w-4 h-4 mr-2" />
@@ -740,7 +740,7 @@ function ReleaseModal({ assignments, onClose, onRelease }: {
                       <span className="flex-1 text-sm text-gray-700 truncate">{r.studentName}</span>
                       <button
                         onClick={() => copyLink(r.token)}
-                        className="flex items-center text-xs text-indigo-600 hover:text-indigo-700"
+                        className="flex items-center text-xs text-forest-600 hover:text-forest-700"
                       >
                         {copied === r.token ? (
                           <><CheckCircle className="w-3 h-3 mr-1" /> Copied</>
@@ -775,7 +775,7 @@ function ReleaseModal({ assignments, onClose, onRelease }: {
             )}
 
             <div className="flex justify-end">
-              <button onClick={onClose} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+              <button onClick={onClose} className="px-4 py-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700">
                 Done
               </button>
             </div>

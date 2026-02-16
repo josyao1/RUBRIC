@@ -8,6 +8,7 @@ import {
   rubricsApi, assignmentsApi, submissionsApi, studentsApi,
   type Assignment
 } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 interface DashboardStats {
   totalRubrics: number;
@@ -24,6 +25,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentAssignments, setRecentAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
     loadDashboardData();
@@ -39,7 +41,6 @@ export default function Dashboard() {
         studentsApi.getAll()
       ]);
 
-      // Calculate stats
       const pendingGrading = submissions.filter(s => s.status === 'pending').length;
       const gradedSubmissions = submissions.filter(s => s.status === 'ready' || s.status === 'reviewed').length;
       const feedbackReleased = submissions.filter(s => (s as any).feedbackReleased).length;
@@ -56,7 +57,6 @@ export default function Dashboard() {
         inProgressAssignments
       });
 
-      // Get recent assignments (up to 3)
       setRecentAssignments(assignments.slice(0, 3));
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
@@ -69,7 +69,7 @@ export default function Dashboard() {
     return (
       <div className="p-8">
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-forest-600" />
           <span className="ml-3 text-gray-600">Loading dashboard...</span>
         </div>
       </div>
@@ -77,34 +77,34 @@ export default function Dashboard() {
   }
 
   const statCards = [
-    { label: 'Rubrics', value: stats?.totalRubrics || 0, icon: FileText, color: 'bg-blue-500', href: '/rubrics' },
-    { label: 'Assignments', value: stats?.totalAssignments || 0, icon: BookOpen, color: 'bg-indigo-500', href: '/assignments' },
-    { label: 'Submissions', value: stats?.totalSubmissions || 0, icon: Upload, color: 'bg-purple-500', href: '/assignments' },
-    { label: 'Students', value: stats?.totalStudents || 0, icon: Users, color: 'bg-teal-500', href: '/students' },
+    { label: 'Rubrics', value: stats?.totalRubrics || 0, icon: FileText, border: 'border-l-forest-500', href: '/rubrics' },
+    { label: 'Assignments', value: stats?.totalAssignments || 0, icon: BookOpen, border: 'border-l-forest-700', href: '/assignments' },
+    { label: 'Submissions', value: stats?.totalSubmissions || 0, icon: Upload, border: 'border-l-accent-500', href: '/assignments' },
+    { label: 'Students', value: stats?.totalStudents || 0, icon: Users, border: 'border-l-forest-400', href: '/students' },
   ];
 
   const feedbackStats = [
-    { label: 'Feedback Ready', value: stats?.gradedSubmissions || 0, icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50' },
-    { label: 'Pending', value: stats?.pendingGrading || 0, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
-    { label: 'Released', value: stats?.feedbackReleased || 0, icon: Send, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { label: 'Feedback Ready', value: stats?.gradedSubmissions || 0, icon: CheckCircle, color: 'text-green-700', bg: 'bg-green-50' },
+    { label: 'Pending', value: stats?.pendingGrading || 0, icon: Clock, color: 'text-amber-700', bg: 'bg-amber-50' },
+    { label: 'Released', value: stats?.feedbackReleased || 0, icon: Send, color: 'text-forest-700', bg: 'bg-forest-50' },
   ];
 
   return (
     <div className="p-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-1">Welcome to FeedbackLab. Here's an overview of your work.</p>
+        <h1 className="text-2xl font-serif font-semibold text-gray-900">Welcome back, {user?.name || 'Teacher'}</h1>
+        <p className="text-gray-500 mt-1">Here's an overview of your work.</p>
       </div>
 
       {/* In Progress Alert */}
       {stats && stats.inProgressAssignments > 0 && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
-          <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-          <p className="text-blue-800">
+        <div className="mb-6 p-4 bg-forest-50 border border-forest-200 rounded-lg flex items-center gap-3">
+          <Loader2 className="w-5 h-5 text-forest-600 animate-spin" />
+          <p className="text-forest-800">
             <span className="font-medium">{stats.inProgressAssignments} assignment{stats.inProgressAssignments !== 1 ? 's' : ''}</span> currently generating feedback...
           </p>
-          <Link to="/assignments" className="ml-auto text-blue-600 hover:text-blue-700 text-sm font-medium">
+          <Link to="/assignments" className="ml-auto text-forest-700 hover:text-forest-800 text-sm font-medium">
             View Progress →
           </Link>
         </div>
@@ -116,23 +116,21 @@ export default function Dashboard() {
           <Link
             key={stat.label}
             to={stat.href}
-            className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-gray-300 transition-all"
+            className={`bg-white rounded-lg border border-gray-200 border-l-4 ${stat.border} p-5 hover:shadow-sm transition-all`}
           >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500">{stat.label}</p>
                 <p className="text-3xl font-bold text-gray-900 mt-1">{stat.value}</p>
               </div>
-              <div className={`${stat.color} p-3 rounded-lg`}>
-                <stat.icon className="w-6 h-6 text-white" />
-              </div>
+              <stat.icon className="w-5 h-5 text-gray-400" />
             </div>
           </Link>
         ))}
       </div>
 
       {/* Feedback Status */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
+      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Feedback Status</h2>
         <div className="grid grid-cols-3 gap-4">
           {feedbackStats.map((stat) => (
@@ -147,10 +145,10 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Assignments */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Recent Assignments</h2>
-            <Link to="/assignments" className="text-sm text-indigo-600 hover:text-indigo-700">
+            <Link to="/assignments" className="text-sm text-forest-600 hover:text-forest-700">
               View all →
             </Link>
           </div>
@@ -158,7 +156,7 @@ export default function Dashboard() {
             <div className="text-center py-6 text-gray-500">
               <BookOpen className="w-10 h-10 mx-auto mb-2 text-gray-300" />
               <p>No assignments yet</p>
-              <Link to="/assignments" className="text-indigo-600 text-sm hover:underline">
+              <Link to="/assignments" className="text-forest-600 text-sm hover:underline">
                 Create your first assignment
               </Link>
             </div>
@@ -167,7 +165,7 @@ export default function Dashboard() {
               {recentAssignments.map((assignment) => (
                 <div
                   key={assignment.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                  className="flex items-center justify-between p-3 bg-surface-warm rounded-lg"
                 >
                   <div className="flex items-center gap-3">
                     <BookOpen className="w-5 h-5 text-gray-400" />
@@ -181,7 +179,7 @@ export default function Dashboard() {
                   </div>
                   <div className="flex items-center gap-2">
                     {assignment.gradingStatus === 'in_progress' && (
-                      <span className="flex items-center gap-1 text-xs text-blue-600">
+                      <span className="flex items-center gap-1 text-xs text-forest-600">
                         <Loader2 className="w-3 h-3 animate-spin" />
                         Generating
                       </span>
@@ -206,14 +204,14 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
           <div className="space-y-3">
             <Link
               to="/rubrics"
-              className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition-colors"
+              className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-forest-300 hover:bg-forest-50 transition-colors"
             >
-              <FileText className="w-8 h-8 text-indigo-600" />
+              <FileText className="w-8 h-8 text-forest-600" />
               <div className="ml-4">
                 <p className="font-medium text-gray-900">Create Rubric</p>
                 <p className="text-sm text-gray-500">Define feedback criteria</p>
@@ -221,9 +219,9 @@ export default function Dashboard() {
             </Link>
             <Link
               to="/assignments"
-              className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition-colors"
+              className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-forest-300 hover:bg-forest-50 transition-colors"
             >
-              <BookOpen className="w-8 h-8 text-indigo-600" />
+              <BookOpen className="w-8 h-8 text-forest-600" />
               <div className="ml-4">
                 <p className="font-medium text-gray-900">New Assignment</p>
                 <p className="text-sm text-gray-500">Create and link to rubric</p>
@@ -231,9 +229,9 @@ export default function Dashboard() {
             </Link>
             <Link
               to="/assignments"
-              className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition-colors"
+              className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-forest-300 hover:bg-forest-50 transition-colors"
             >
-              <Upload className="w-8 h-8 text-indigo-600" />
+              <Upload className="w-8 h-8 text-forest-600" />
               <div className="ml-4">
                 <p className="font-medium text-gray-900">Upload Submissions</p>
                 <p className="text-sm text-gray-500">Open an assignment and upload work</p>
@@ -241,9 +239,9 @@ export default function Dashboard() {
             </Link>
             <Link
               to="/students"
-              className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition-colors"
+              className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-forest-300 hover:bg-forest-50 transition-colors"
             >
-              <Send className="w-8 h-8 text-indigo-600" />
+              <Send className="w-8 h-8 text-forest-600" />
               <div className="ml-4">
                 <p className="font-medium text-gray-900">Release Feedback</p>
                 <p className="text-sm text-gray-500">Share feedback with students</p>

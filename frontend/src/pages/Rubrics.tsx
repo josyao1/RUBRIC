@@ -60,7 +60,7 @@ export default function Rubrics() {
           </button>
           <button
             onClick={() => setShowBuilder(true)}
-            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            className="flex items-center px-4 py-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700 transition-colors"
           >
             <Plus className="w-4 h-4 mr-2" />
             Create Rubric
@@ -114,14 +114,14 @@ export default function Rubrics() {
       {/* Loading State */}
       {loading && (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-forest-600" />
           <span className="ml-3 text-gray-600">Loading rubrics...</span>
         </div>
       )}
 
       {/* Rubrics List */}
       {!loading && rubrics.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
           <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No rubrics yet</h3>
           <p className="text-gray-500 mb-6">Upload an existing rubric or create one from scratch.</p>
@@ -135,7 +135,7 @@ export default function Rubrics() {
             </button>
             <button
               onClick={() => setShowBuilder(true)}
-              className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+              className="flex items-center px-4 py-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700"
             >
               <Plus className="w-4 h-4 mr-2" />
               Create
@@ -163,11 +163,11 @@ function RubricCard({ rubric, onDelete, onView }: { rubric: Rubric; onDelete: ()
   const hasLevels = rubric.criteria?.some(c => c.levels && c.levels.length > 0);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
+    <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center">
-          <div className={`p-2 rounded-lg ${hasCriteria ? 'bg-indigo-100' : 'bg-yellow-100'}`}>
-            <FileText className={`w-5 h-5 ${hasCriteria ? 'text-indigo-600' : 'text-yellow-600'}`} />
+          <div className={`p-2 rounded-lg ${hasCriteria ? 'bg-forest-100' : 'bg-yellow-100'}`}>
+            <FileText className={`w-5 h-5 ${hasCriteria ? 'text-forest-600' : 'text-yellow-600'}`} />
           </div>
           <div className="ml-3">
             <h3 className="font-semibold text-gray-900">{rubric.name}</h3>
@@ -189,7 +189,7 @@ function RubricCard({ rubric, onDelete, onView }: { rubric: Rubric; onDelete: ()
         </span>
         <button
           onClick={onView}
-          className="flex items-center gap-1 text-indigo-600 hover:text-indigo-700 font-medium"
+          className="flex items-center gap-1 text-forest-600 hover:text-forest-700 font-medium"
         >
           <Eye className="w-4 h-4" />
           View
@@ -251,7 +251,7 @@ function UploadModal({ onClose, onUpload, userId }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl w-full max-w-lg mx-4 p-6">
+      <div className="bg-white rounded-lg w-full max-w-lg mx-4 p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">Upload Rubric</h2>
 
         {error && (
@@ -262,7 +262,7 @@ function UploadModal({ onClose, onUpload, userId }: {
 
         <div
           className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-            dragActive ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300'
+            dragActive ? 'border-forest-500 bg-forest-50' : 'border-gray-300'
           }`}
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
@@ -271,7 +271,7 @@ function UploadModal({ onClose, onUpload, userId }: {
         >
           {file ? (
             <div className="flex items-center justify-center gap-3">
-              <FileText className="w-8 h-8 text-indigo-600" />
+              <FileText className="w-8 h-8 text-forest-600" />
               <span className="font-medium">{file.name}</span>
               <button onClick={() => setFile(null)} className="text-gray-400 hover:text-red-500">
                 <Trash2 className="w-4 h-4" />
@@ -288,7 +288,7 @@ function UploadModal({ onClose, onUpload, userId }: {
                 <span className="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600">Images (.png, .jpg)</span>
                 <span className="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600">Text (.txt)</span>
               </div>
-              <label className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 cursor-pointer">
+              <label className="inline-flex items-center px-4 py-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700 cursor-pointer">
                 <input
                   type="file"
                   className="hidden"
@@ -311,7 +311,7 @@ function UploadModal({ onClose, onUpload, userId }: {
           <button
             onClick={handleUpload}
             disabled={!file || uploading}
-            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center px-4 py-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {uploading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             {uploading ? 'Processing with AI...' : 'Upload'}
@@ -387,7 +387,7 @@ function BuilderModal({ onClose, onSave, userId }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-xl font-bold text-gray-900">Create Rubric</h2>
         </div>
@@ -408,7 +408,7 @@ function BuilderModal({ onClose, onSave, userId }: {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Essay Feedback Rubric"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 focus:border-forest-500"
               />
             </div>
             <div>
@@ -418,7 +418,7 @@ function BuilderModal({ onClose, onSave, userId }: {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optional description..."
                 rows={2}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 focus:border-forest-500"
               />
             </div>
           </div>
@@ -461,7 +461,7 @@ function BuilderModal({ onClose, onSave, userId }: {
             </div>
             <button
               onClick={addCriterion}
-              className="mt-3 flex items-center text-sm text-indigo-600 hover:text-indigo-700"
+              className="mt-3 flex items-center text-sm text-forest-600 hover:text-forest-700"
             >
               <Plus className="w-4 h-4 mr-1" />
               Add Criterion
@@ -479,7 +479,7 @@ function BuilderModal({ onClose, onSave, userId }: {
           <button
             onClick={handleSave}
             disabled={!name.trim() || saving}
-            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            className="flex items-center px-4 py-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700 disabled:opacity-50"
           >
             {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             {saving ? 'Saving...' : 'Save Rubric'}
@@ -627,7 +627,7 @@ function ViewRubricModal({ rubric, onClose }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
@@ -669,7 +669,7 @@ function ViewRubricModal({ rubric, onClose }: {
               onClick={() => setActiveTab('criteria')}
               className={`py-3 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
                 activeTab === 'criteria'
-                  ? 'border-indigo-600 text-indigo-600'
+                  ? 'border-forest-600 text-forest-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -680,7 +680,7 @@ function ViewRubricModal({ rubric, onClose }: {
               onClick={() => setActiveTab('source')}
               className={`py-3 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
                 activeTab === 'source'
-                  ? 'border-indigo-600 text-indigo-600'
+                  ? 'border-forest-600 text-forest-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -691,7 +691,7 @@ function ViewRubricModal({ rubric, onClose }: {
               onClick={() => setActiveTab('feedback')}
               className={`py-3 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
                 activeTab === 'feedback'
-                  ? 'border-indigo-600 text-indigo-600'
+                  ? 'border-forest-600 text-forest-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -705,7 +705,7 @@ function ViewRubricModal({ rubric, onClose }: {
         <div className="flex-1 overflow-auto p-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+              <Loader2 className="w-8 h-8 animate-spin text-forest-600" />
               <span className="ml-3 text-gray-600">Loading rubric...</span>
             </div>
           ) : activeTab === 'criteria' ? (
@@ -715,7 +715,7 @@ function ViewRubricModal({ rubric, onClose }: {
                   <FileText className="w-12 h-12 mx-auto mb-4 text-gray-400" />
                   <p>No criteria yet.</p>
                   {isEditing && (
-                    <button onClick={addCriterion} className="mt-4 text-indigo-600 hover:text-indigo-700">
+                    <button onClick={addCriterion} className="mt-4 text-forest-600 hover:text-forest-700">
                       + Add Criterion
                     </button>
                   )}
@@ -805,7 +805,7 @@ function ViewRubricModal({ rubric, onClose }: {
                   {isEditing && (
                     <button
                       onClick={addCriterion}
-                      className="mt-4 flex items-center text-sm text-indigo-600 hover:text-indigo-700"
+                      className="mt-4 flex items-center text-sm text-forest-600 hover:text-forest-700"
                     >
                       <Plus className="w-4 h-4 mr-1" />
                       Add Criterion
@@ -852,7 +852,7 @@ function ViewRubricModal({ rubric, onClose }: {
                   {isEditing && (
                     <button
                       onClick={addCriterion}
-                      className="flex items-center text-sm text-indigo-600 hover:text-indigo-700"
+                      className="flex items-center text-sm text-forest-600 hover:text-forest-700"
                     >
                       <Plus className="w-4 h-4 mr-1" />
                       Add Criterion
@@ -905,12 +905,12 @@ function ViewRubricModal({ rubric, onClose }: {
 
               {feedbackFetching ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                  <Loader2 className="w-8 h-8 animate-spin text-forest-600" />
                   <span className="ml-3 text-gray-600">Loading feedback...</span>
                 </div>
               ) : !feedbackResult ? (
                 <div className="text-center py-12">
-                  <Sparkles className="w-12 h-12 mx-auto mb-4 text-indigo-400" />
+                  <Sparkles className="w-12 h-12 mx-auto mb-4 text-forest-400" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">Get AI Feedback on Your Rubric</h3>
                   <p className="text-gray-500 mb-6 max-w-md mx-auto">
                     Our AI will analyze your rubric and provide suggestions for improving clarity,
@@ -919,7 +919,7 @@ function ViewRubricModal({ rubric, onClose }: {
                   <button
                     onClick={handleGenerateFeedback}
                     disabled={feedbackLoading || criteria.length === 0}
-                    className="inline-flex items-center px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="inline-flex items-center px-6 py-3 bg-forest-600 text-white rounded-lg hover:bg-forest-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {feedbackLoading ? (
                       <>
@@ -943,7 +943,7 @@ function ViewRubricModal({ rubric, onClose }: {
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-indigo-600" />
+                      <Sparkles className="w-5 h-5 text-forest-600" />
                       <h3 className="font-medium text-gray-900">AI Feedback</h3>
                     </div>
                     <div className="flex items-center gap-3">
@@ -953,7 +953,7 @@ function ViewRubricModal({ rubric, onClose }: {
                       <button
                         onClick={handleGenerateFeedback}
                         disabled={feedbackLoading}
-                        className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                        className="text-sm text-forest-600 hover:text-forest-700 flex items-center gap-1"
                       >
                         {feedbackLoading ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -979,7 +979,7 @@ function ViewRubricModal({ rubric, onClose }: {
             {!isEditing && activeTab === 'criteria' && (
               <button
                 onClick={() => setIsEditing(true)}
-                className="px-4 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg"
+                className="px-4 py-2 text-forest-600 hover:bg-forest-50 rounded-lg"
               >
                 Edit Rubric
               </button>
@@ -997,7 +997,7 @@ function ViewRubricModal({ rubric, onClose }: {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                  className="flex items-center px-4 py-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700 disabled:opacity-50"
                 >
                   {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   {saving ? 'Saving...' : 'Save Changes'}
@@ -1032,7 +1032,7 @@ function FeedbackCards({ feedback }: { feedback: string }) {
   const getSectionStyle = (title: string) => {
     const lower = title.toLowerCase();
     if (lower.includes('overall') || lower.includes('assessment') || lower.includes('summary')) {
-      return { bg: 'bg-indigo-50', border: 'border-indigo-200', accent: 'bg-indigo-500', text: 'text-indigo-900' };
+      return { bg: 'bg-forest-50', border: 'border-forest-200', accent: 'bg-forest-500', text: 'text-forest-900' };
     }
     if (lower.includes('transparency') || lower.includes('clarity')) {
       return { bg: 'bg-blue-50', border: 'border-blue-200', accent: 'bg-blue-500', text: 'text-blue-900' };
@@ -1107,7 +1107,7 @@ function FeedbackCards({ feedback }: { feedback: string }) {
     <div className="space-y-4">
       {/* Overview card for intro text */}
       {introText && (
-        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl overflow-hidden shadow-sm">
+        <div className="bg-gradient-to-r from-forest-600 to-forest-800 rounded-lg overflow-hidden shadow-sm">
           <div className="px-5 py-3">
             <h2 className="text-white font-bold text-lg">Overview</h2>
           </div>
@@ -1130,7 +1130,7 @@ function FeedbackCards({ feedback }: { feedback: string }) {
         return (
           <div
             key={idx}
-            className={`${style.bg} border ${style.border} rounded-xl overflow-hidden shadow-sm`}
+            className={`${style.bg} border ${style.border} rounded-lg overflow-hidden shadow-sm`}
           >
             {/* Card header */}
             <div className={`${style.accent} px-5 py-3`}>

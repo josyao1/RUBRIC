@@ -30,6 +30,8 @@ user_stories.txt
 # OS
 .DS_Store
 Thumbs.db
+.claude/
+SKILL.md
 
 # Logs
 *.log
