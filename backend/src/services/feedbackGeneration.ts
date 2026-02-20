@@ -615,3 +615,285 @@ export async function processAssignmentFeedback(
 
   console.log(`[FEEDBACK] Completed feedback generation for assignment ${assignmentId}`);
 }
+
+// =============================================================================
+// RESUBMISSION PROMPT BUILDERS (draft-comparison aware)
+// =============================================================================
+function buildResubmissionInlineCommentsPrompt(
+  revisedText: string,
+  originalText: string,
+  criteria: RubricCriterion[],
+  teacherPreferences?: string
+): string {
+  const criteriaDescription = criteria.map(c => {
+    const levelsDesc = c.levels.map(l => `    - ${l.label}: ${l.description}`).join('\n');
+    return `**${c.name}**${c.description ? `: ${c.description}` : ''}\n  Performance Levels:\n${levelsDesc}`;
+  }).join('\n\n');
+
+  return `You are an experienced educator reviewing a student's REVISED submission against their original draft.
+
+${teacherPreferences ? `=== ASSIGNMENT CONTEXT & TEACHER INSTRUCTIONS ===\nUse this to understand what the assignment is about and any specific guidance for feedback.\n${teacherPreferences}\n\n` : ''}=== THE RUBRIC ===
+${criteriaDescription}
+
+=== ORIGINAL DRAFT ===
+${originalText}
+=== END ORIGINAL DRAFT ===
+
+=== REVISED DRAFT (the one you are commenting on) ===
+${revisedText}
+=== END REVISED DRAFT ===
+
+=== YOUR TASK ===
+Find 4-7 specific places in the REVISED DRAFT that still fall short of rubric expectations.
+Focus on gaps that remain from the original OR new issues introduced in the revision.
+Where the student has clearly improved a specific area, do not comment on it — save that acknowledgement for the overall feedback.
+
+Each comment must:
+1. Target an exact phrase from the REVISED DRAFT
+2. State what is still weak according to the rubric
+3. Tell the student specifically what to do to improve it further
+Do NOT start the comment with the criterion name — it is already shown as a label in the UI.
+
+Return JSON:
+{
+  "inlineHighlights": [
+    {
+      "highlightedText": "exact phrase from the REVISED DRAFT (3-12 words)",
+      "comment": "What's still weak and how to fix it",
+      "criterionName": "exact rubric criterion name"
+    }
+  ]
+}
+
+Return ONLY valid JSON, no markdown code blocks.`;
+}
+
+function buildResubmissionSynthesizedFeedbackPrompt(
+  revisedText: string,
+  originalText: string,
+  criteria: RubricCriterion[],
+  teacherPreferences?: string
+): string {
+  const criteriaDescription = criteria.map(c => {
+    const levelsDesc = c.levels.map(l => `    - ${l.label}: ${l.description}`).join('\n');
+    return `**${c.name}**${c.description ? `: ${c.description}` : ''}\n  Performance Levels (highest to lowest):\n${levelsDesc}`;
+  }).join('\n\n');
+
+  return `You are an experienced educator reviewing a student's REVISED submission and comparing it to their original draft.
+
+${teacherPreferences ? `=== ASSIGNMENT CONTEXT & TEACHER INSTRUCTIONS ===\nUse this to understand what the assignment is about and any specific guidance for feedback.\n${teacherPreferences}\n\n` : ''}=== THE RUBRIC ===
+${criteriaDescription}
+
+=== ORIGINAL DRAFT ===
+${originalText}
+=== END ORIGINAL DRAFT ===
+
+=== REVISED DRAFT ===
+${revisedText}
+=== END REVISED DRAFT ===
+
+=== YOUR TASK ===
+Compare both drafts criterion by criterion. For each criterion:
+- Identify genuine improvements the student made from draft 1 to draft 2 (be specific, quote or reference what changed)
+- Identify what still needs work in the revised draft
+- Give a concrete suggestion for the next revision
+
+For the overall feedback:
+- Open with a genuine acknowledgement of the most meaningful improvement between drafts
+- Identify the 2-3 most important remaining gaps
+- Give encouraging, specific next steps
+
+IMPORTANT:
+- Use the rubric levels internally to calibrate your assessment, but NEVER name or reference levels to the student
+- Be honest about what hasn't improved — don't over-praise minimal changes
+- Keep all feedback grounded in the rubric criteria
+
+Return JSON exactly:
+{
+  "sectionFeedback": [
+    {
+      "criterionName": "exact criterion name from rubric",
+      "strengths": ["specific improvement from draft 1 to draft 2", "another if applicable"],
+      "areasForGrowth": "what still needs work in the revised draft",
+      "suggestions": "one concrete thing to do in the next revision"
+    }
+  ],
+  "overall": {
+    "summary": "2-3 sentences acknowledging key improvements and naming the main remaining challenge",
+    "priorityImprovements": ["most important remaining gap", "second most important"],
+    "encouragement": "one sentence that names a specific genuine improvement made between drafts",
+    "nextSteps": ["specific actionable step 1", "specific actionable step 2"]
+  }
+}
+
+Return ONLY valid JSON, no markdown code blocks.`;
+}
+
+// =============================================================================
+// RESUBMISSION PROCESSING
+// =============================================================================
+export async function processResubmissionFeedback(newSubmissionId: string): Promise<void> {
+  console.log(`[RESUBMIT] Starting auto-grading for resubmission ${newSubmissionId}`);
+
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY not configured');
+  }
+
+  // Fetch new submission + parent + rubric via assignment
+  const newSubmission = await prisma.submission.findUnique({
+    where: { id: newSubmissionId },
+    include: {
+      parentSubmission: true,
+      assignment: {
+        include: {
+          rubric: {
+            include: {
+              criteria: {
+                include: { levels: true },
+                orderBy: { sortOrder: 'asc' }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (!newSubmission) throw new Error('Resubmission not found');
+  if (!newSubmission.parentSubmission) throw new Error('No parent submission found');
+  if (!newSubmission.assignment?.rubric) throw new Error('Assignment has no rubric');
+  if (!newSubmission.extractedText) throw new Error('Resubmission has no extracted text');
+  if (!newSubmission.parentSubmission.extractedText) throw new Error('Original submission has no extracted text');
+
+  const teacherPreferences = newSubmission.assignment.teacherPreferences ?? undefined;
+  const criteria: RubricCriterion[] = newSubmission.assignment.rubric.criteria.map(c => ({
+    id: c.id,
+    name: c.name,
+    description: c.description,
+    levels: c.levels.map(l => ({ label: l.label, description: l.description }))
+  }));
+
+  await prisma.submission.update({ where: { id: newSubmissionId }, data: { status: 'processing' } });
+
+  try {
+    // Clear any existing feedback on the resubmission
+    await prisma.inlineComment.deleteMany({ where: { submissionId: newSubmissionId } });
+    await prisma.sectionFeedback.deleteMany({ where: { submissionId: newSubmissionId } });
+    await prisma.overallFeedback.deleteMany({ where: { submissionId: newSubmissionId } });
+
+    // Call 1: Inline comments (revision-aware)
+    const inlinePrompt = buildResubmissionInlineCommentsPrompt(
+      newSubmission.extractedText,
+      newSubmission.parentSubmission.extractedText,
+      criteria,
+      teacherPreferences
+    );
+    console.log('[RESUBMIT] Generating inline comments...');
+    const inlineResponse = await callGeminiWithRetry(inlinePrompt);
+
+    let inlineJson = inlineResponse;
+    const inlineMatch = inlineResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (inlineMatch) inlineJson = inlineMatch[1];
+
+    const inlineParsed = JSON.parse(inlineJson.trim());
+    const highlights = inlineParsed.inlineHighlights || [];
+
+    const MAX_HIGHLIGHT_LENGTH = 150;
+    const MAX_HIGHLIGHT_PERCENT = 0.15;
+    const docLength = newSubmission.extractedText!.length;
+    let savedCount = 0;
+
+    for (const highlight of highlights) {
+      if (!highlight.highlightedText) continue;
+
+      const pos = findTextPosition(newSubmission.extractedText!, highlight.highlightedText);
+      if (!pos) {
+        console.log(`[RESUBMIT] Text not found: "${highlight.highlightedText?.substring(0, 40)}..."`);
+        continue;
+      }
+
+      const highlightLength = pos.end - pos.start;
+      if (highlightLength > MAX_HIGHLIGHT_LENGTH || highlightLength > docLength * MAX_HIGHLIGHT_PERCENT) {
+        console.log(`[RESUBMIT] Highlight too long (${highlightLength} chars), skipping`);
+        continue;
+      }
+
+      const actualText = newSubmission.extractedText!.substring(pos.start, pos.end);
+      const criterion = criteria.find(c =>
+        c.name.toLowerCase() === (highlight.criterionName || '').toLowerCase()
+      );
+
+      await prisma.inlineComment.create({
+        data: {
+          submissionId: newSubmissionId,
+          criterionId: criterion?.id,
+          highlightedText: actualText,
+          comment: highlight.comment,
+          startPosition: pos.start,
+          endPosition: pos.end
+        }
+      });
+      savedCount++;
+    }
+    console.log(`[RESUBMIT] Saved ${savedCount} inline comments`);
+
+    await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CALLS_MS));
+
+    // Call 2: Synthesized comparison feedback
+    const synthPrompt = buildResubmissionSynthesizedFeedbackPrompt(
+      newSubmission.extractedText,
+      newSubmission.parentSubmission.extractedText,
+      criteria,
+      teacherPreferences
+    );
+    console.log('[RESUBMIT] Generating comparison feedback...');
+    const synthResponse = await callGeminiWithRetry(synthPrompt);
+
+    let synthJson = synthResponse;
+    const synthMatch = synthResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (synthMatch) synthJson = synthMatch[1];
+
+    const synthParsed = JSON.parse(synthJson.trim());
+
+    // Save section feedback
+    for (const section of (synthParsed.sectionFeedback || [])) {
+      const criterion = criteria.find(c =>
+        c.name.toLowerCase() === (section.criterionName || '').toLowerCase()
+      );
+      if (criterion) {
+        const toJsonArray = (v: any) =>
+          JSON.stringify(Array.isArray(v) ? v : (v ? [v] : []));
+
+        await prisma.sectionFeedback.create({
+          data: {
+            submissionId: newSubmissionId,
+            criterionId: criterion.id,
+            strengths: toJsonArray(section.strengths),
+            areasForGrowth: toJsonArray(section.areasForGrowth),
+            suggestions: toJsonArray(section.suggestions)
+          }
+        });
+      }
+    }
+
+    // Save overall feedback
+    if (synthParsed.overall) {
+      await prisma.overallFeedback.create({
+        data: {
+          submissionId: newSubmissionId,
+          summary: synthParsed.overall.summary || '',
+          priorityImprovements: JSON.stringify(synthParsed.overall.priorityImprovements || []),
+          encouragement: synthParsed.overall.encouragement || '',
+          nextSteps: JSON.stringify(synthParsed.overall.nextSteps || [])
+        }
+      });
+    }
+
+    await prisma.submission.update({ where: { id: newSubmissionId }, data: { status: 'ready' } });
+    console.log(`[RESUBMIT] Auto-grading complete for resubmission ${newSubmissionId}`);
+  } catch (error) {
+    console.error(`[RESUBMIT] Auto-grading failed for ${newSubmissionId}:`, error);
+    await prisma.submission.update({ where: { id: newSubmissionId }, data: { status: 'error' } });
+    throw error;
+  }
+}

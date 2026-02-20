@@ -343,6 +343,17 @@ export interface SubmissionWithFeedback extends Submission {
   overallFeedback?: OverallFeedback;
 }
 
+export interface LatestRevision {
+  id: string;
+  fileName: string;
+  status: string; // 'pending' | 'processing' | 'ready' | 'error'
+  submittedAt: string;
+  extractedText?: string;
+  inlineComments: InlineComment[];
+  sectionFeedback: SectionFeedback[];
+  overallFeedback?: OverallFeedback;
+}
+
 export const submissionsApi = {
   // Get all submissions
   getAll: () => fetchApi<Submission[]>('/submissions'),
@@ -450,7 +461,7 @@ export const studentsApi = {
     }),
 
   getFeedback: (token: string) =>
-    fetchApi<SubmissionWithFeedback & { studentName?: string; assignmentName?: string }>(
+    fetchApi<SubmissionWithFeedback & { studentName?: string; assignmentName?: string; latestRevision?: LatestRevision }>(
       `/students/feedback/${token}`
     ),
 

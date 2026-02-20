@@ -13,7 +13,7 @@ import {
   Bot, Download
 } from 'lucide-react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
-import { studentsApi, type SubmissionWithFeedback } from '../services/api';
+import { studentsApi, type SubmissionWithFeedback, type LatestRevision } from '../services/api';
 import { parseJsonArray } from '../utils/parseJsonArray';
 import HighlightedDocument from '../components/HighlightedDocument';
 import ChatPanel, { type ChatPanelHandle } from '../components/ChatPanel';
@@ -24,6 +24,7 @@ interface FeedbackData extends SubmissionWithFeedback {
   studentName?: string;
   assignmentName?: string;
   extractedText?: string;
+  latestRevision?: LatestRevision;
 }
 
 export default function StudentFeedback() {
@@ -33,9 +34,27 @@ export default function StudentFeedback() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'document' | 'criteria' | 'overall'>('overall');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [activeDraft, setActiveDraft] = useState<'original' | 'revision'>('original');
+  const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
 
   // Chat ref
   const chatRef = useRef<ChatPanelHandle>(null);
+
+  // Cross-scroll: clicking a highlight scrolls the sidebar comment into view, and vice versa
+  const handleCommentClick = (id: string) => {
+    setActiveCommentId(prev => prev === id ? null : id);
+  };
+
+  useEffect(() => {
+    if (!activeCommentId) return;
+    const t = setTimeout(() => {
+      document.querySelector(`[data-highlight-id="${activeCommentId}"]`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      document.querySelector(`[data-comment-id="${activeCommentId}"]`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 30);
+    return () => clearTimeout(t);
+  }, [activeCommentId]);
 
   useEffect(() => {
     if (token) {
@@ -89,10 +108,29 @@ export default function StudentFeedback() {
     chatRef.current?.sendMessage(message);
   };
 
+  // Choose between original and revision data for display
+  const latestRevision = feedback?.latestRevision;
+  const revisionReady = latestRevision?.status === 'ready';
+  const displayData = (activeDraft === 'revision' && revisionReady && latestRevision)
+    ? {
+        overallFeedback: latestRevision.overallFeedback,
+        sectionFeedback: latestRevision.sectionFeedback,
+        inlineComments: latestRevision.inlineComments,
+        extractedText: latestRevision.extractedText,
+        fileName: latestRevision.fileName,
+      }
+    : {
+        overallFeedback: feedback?.overallFeedback,
+        sectionFeedback: feedback?.sectionFeedback,
+        inlineComments: feedback?.inlineComments,
+        extractedText: feedback?.extractedText,
+        fileName: feedback?.fileName,
+      };
+
   const sortedComments = useMemo(() => {
-    if (!feedback?.inlineComments) return [];
-    return [...feedback.inlineComments].sort((a, b) => a.startPosition - b.startPosition);
-  }, [feedback]);
+    if (!displayData.inlineComments) return [];
+    return [...displayData.inlineComments].sort((a, b) => a.startPosition - b.startPosition);
+  }, [activeDraft, feedback]);
 
 
   if (loading) {
@@ -138,14 +176,14 @@ export default function StudentFeedback() {
                 <FeedbackPDF
                   studentName={feedback.studentName}
                   assignmentName={feedback.assignmentName}
-                  fileName={feedback.fileName}
-                  overallFeedback={feedback.overallFeedback}
-                  sectionFeedback={feedback.sectionFeedback}
-                  inlineComments={feedback.inlineComments}
-                  extractedText={feedback.extractedText}
+                  fileName={displayData.fileName}
+                  overallFeedback={displayData.overallFeedback}
+                  sectionFeedback={displayData.sectionFeedback}
+                  inlineComments={displayData.inlineComments}
+                  extractedText={displayData.extractedText}
                 />
               }
-              fileName={`feedback-${feedback.studentName?.replace(/\s+/g, '-') || 'student'}-${feedback.assignmentName?.replace(/\s+/g, '-') || 'assignment'}.pdf`}
+              fileName={`feedback-${feedback.studentName?.replace(/\s+/g, '-') || 'student'}-${feedback.assignmentName?.replace(/\s+/g, '-') || 'assignment'}${activeDraft === 'revision' ? '-revised' : ''}.pdf`}
             >
               {({ loading: pdfLoading }) => (
                 <button
@@ -173,15 +211,56 @@ export default function StudentFeedback() {
                 <span className="font-medium text-gray-900">{feedback.assignmentName}</span>
               </div>
             )}
-            {feedback.fileName && (
+            {displayData.fileName && (
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-700">{feedback.fileName}</span>
+                <span className="text-gray-700">{displayData.fileName}</span>
               </div>
             )}
           </div>
         </div>
       </header>
+
+      {/* Draft switcher — shown when a revision exists */}
+      {latestRevision && (
+        <div className="bg-blue-50 border-b border-blue-200">
+          <div className="max-w-5xl mx-auto px-4 py-2 flex items-center gap-3 flex-wrap">
+            <span className="text-sm text-blue-800 font-medium">Revised draft submitted</span>
+            {revisionReady ? (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => { setActiveDraft('original'); setActiveCommentId(null); }}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                    activeDraft === 'original'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-blue-700 hover:bg-blue-100'
+                  }`}
+                >
+                  Original Draft
+                </button>
+                <button
+                  onClick={() => { setActiveDraft('revision'); setActiveCommentId(null); }}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                    activeDraft === 'revision'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-blue-700 hover:bg-blue-100'
+                  }`}
+                >
+                  Revised Draft
+                  {activeDraft === 'original' && (
+                    <span className="px-1.5 py-0.5 bg-green-500 text-white text-xs rounded-full leading-none">New</span>
+                  )}
+                </button>
+              </div>
+            ) : (
+              <span className="text-sm text-blue-600 flex items-center gap-1.5">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Grading in progress — check back shortly for updated feedback.
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
@@ -207,7 +286,7 @@ export default function StudentFeedback() {
               }`}
             >
               <CheckCircle className="w-4 h-4 inline mr-2" />
-              By Criteria ({feedback.sectionFeedback?.length || 0})
+              By Criteria ({displayData.sectionFeedback?.length || 0})
             </button>
             <button
               onClick={() => setActiveTab('document')}
@@ -226,17 +305,17 @@ export default function StudentFeedback() {
 
       {/* Content */}
       <main className="max-w-5xl mx-auto px-4 py-8">
-        {activeTab === 'overall' && feedback.overallFeedback && (
+        {activeTab === 'overall' && displayData.overallFeedback && (
           <div className="space-y-6">
             {/* Summary */}
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <h2 className="text-lg font-semibold text-gray-900 mb-3">Summary</h2>
-                  <p className="text-gray-700 leading-relaxed font-serif">{feedback.overallFeedback.summary}</p>
+                  <p className="text-gray-700 leading-relaxed font-serif">{displayData.overallFeedback.summary}</p>
                 </div>
                 <button
-                  onClick={() => askAboutOverall('summary', feedback.overallFeedback!.summary)}
+                  onClick={() => askAboutOverall('summary', displayData.overallFeedback!.summary)}
                   className="flex-shrink-0 flex items-center gap-1 text-xs text-forest-600 hover:text-forest-700 hover:bg-forest-50 px-2 py-1 rounded"
                 >
                   <Bot className="w-3 h-3" />
@@ -246,18 +325,18 @@ export default function StudentFeedback() {
             </div>
 
             {/* What You Did Well */}
-            {feedback.overallFeedback.encouragement && (
+            {displayData.overallFeedback.encouragement && (
               <div className="bg-green-50 rounded-lg border border-green-200 p-6">
                 <h2 className="text-lg font-semibold text-green-900 mb-3 flex items-center gap-2">
                   <CheckCircle className="w-5 h-5" />
                   What You Did Well
                 </h2>
-                <p className="text-gray-700 leading-relaxed font-serif">{feedback.overallFeedback.encouragement}</p>
+                <p className="text-gray-700 leading-relaxed font-serif">{displayData.overallFeedback.encouragement}</p>
               </div>
             )}
 
             {/* Priority Improvements */}
-            {parseJsonArray(feedback.overallFeedback.priorityImprovements).length > 0 && (
+            {parseJsonArray(displayData.overallFeedback.priorityImprovements).length > 0 && (
               <div className="bg-amber-50 rounded-lg border border-amber-200 p-6">
                 <div className="flex items-start justify-between gap-4 mb-4">
                   <h2 className="text-lg font-semibold text-amber-900 flex items-center gap-2">
@@ -265,7 +344,7 @@ export default function StudentFeedback() {
                     Priority Improvements
                   </h2>
                   <button
-                    onClick={() => askAboutOverall('improvements', parseJsonArray(feedback.overallFeedback!.priorityImprovements))}
+                    onClick={() => askAboutOverall('improvements', parseJsonArray(displayData.overallFeedback!.priorityImprovements))}
                     className="flex-shrink-0 flex items-center gap-1 text-xs text-amber-700 hover:text-amber-800 hover:bg-amber-100 px-2 py-1 rounded"
                   >
                     <Bot className="w-3 h-3" />
@@ -273,7 +352,7 @@ export default function StudentFeedback() {
                   </button>
                 </div>
                 <ol className="space-y-3">
-                  {parseJsonArray(feedback.overallFeedback.priorityImprovements).map((item, i) => (
+                  {parseJsonArray(displayData.overallFeedback.priorityImprovements).map((item, i) => (
                     <li key={i} className="flex items-start gap-3">
                       <span className="flex-shrink-0 w-6 h-6 bg-amber-200 text-amber-800 rounded-full text-sm flex items-center justify-center font-medium">
                         {i + 1}
@@ -286,7 +365,7 @@ export default function StudentFeedback() {
             )}
 
             {/* Next Steps */}
-            {parseJsonArray(feedback.overallFeedback.nextSteps).length > 0 && (
+            {parseJsonArray(displayData.overallFeedback.nextSteps).length > 0 && (
               <div className="bg-blue-50 rounded-lg border border-blue-200 p-6">
                 <div className="flex items-start justify-between gap-4 mb-4">
                   <h2 className="text-lg font-semibold text-blue-900 flex items-center gap-2">
@@ -294,7 +373,7 @@ export default function StudentFeedback() {
                     Next Steps
                   </h2>
                   <button
-                    onClick={() => askAboutOverall('nextSteps', parseJsonArray(feedback.overallFeedback!.nextSteps))}
+                    onClick={() => askAboutOverall('nextSteps', parseJsonArray(displayData.overallFeedback!.nextSteps))}
                     className="flex-shrink-0 flex items-center gap-1 text-xs text-blue-700 hover:text-blue-800 hover:bg-blue-100 px-2 py-1 rounded"
                   >
                     <Bot className="w-3 h-3" />
@@ -302,7 +381,7 @@ export default function StudentFeedback() {
                   </button>
                 </div>
                 <ul className="space-y-2">
-                  {parseJsonArray(feedback.overallFeedback.nextSteps).map((item, i) => (
+                  {parseJsonArray(displayData.overallFeedback.nextSteps).map((item, i) => (
                     <li key={i} className="flex items-start gap-2 text-gray-700">
                       <span className="text-blue-500 mt-1">→</span>
                       {item}
@@ -316,7 +395,7 @@ export default function StudentFeedback() {
 
         {activeTab === 'criteria' && (
           <div className="space-y-4">
-            {feedback.sectionFeedback?.map(section => {
+            {displayData.sectionFeedback?.map(section => {
               const isExpanded = expandedSections.has(section.id);
               const strengths = parseJsonArray(section.strengths);
               const areasForGrowth = parseJsonArray(section.areasForGrowth);
@@ -426,13 +505,18 @@ export default function StudentFeedback() {
         {activeTab === 'document' && (
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Your Submission with Comments</h2>
-            {!feedback.extractedText ? (
+            {!displayData.extractedText ? (
               <p className="text-gray-500">No document text available.</p>
             ) : (
               <div className="flex gap-4">
                 {/* Document with highlights */}
                 <div className={`bg-gray-50 rounded-lg p-4 overflow-auto ${sortedComments.length > 0 ? 'flex-1' : 'w-full'}`} style={{ maxHeight: '60vh' }}>
-                  <HighlightedDocument text={feedback.extractedText} comments={sortedComments} />
+                  <HighlightedDocument
+                    text={displayData.extractedText}
+                    comments={sortedComments}
+                    activeCommentId={activeCommentId}
+                    onCommentClick={handleCommentClick}
+                  />
                 </div>
 
                 {/* Comments sidebar */}
@@ -445,7 +529,13 @@ export default function StudentFeedback() {
                       {sortedComments.map((comment, idx) => (
                         <div
                           key={comment.id}
-                          className="bg-yellow-50 border border-yellow-200 rounded-lg p-3"
+                          data-comment-id={comment.id}
+                          onClick={() => handleCommentClick(comment.id)}
+                          className={`rounded-lg p-3 cursor-pointer transition-colors ${
+                            activeCommentId === comment.id
+                              ? 'bg-yellow-200 border-2 border-yellow-500'
+                              : 'bg-yellow-50 border border-yellow-200 hover:bg-yellow-100'
+                          }`}
                         >
                           <div className="flex items-start gap-2">
                             <span className="flex-shrink-0 w-5 h-5 bg-yellow-400 text-yellow-900 rounded-full text-xs flex items-center justify-center font-medium">
@@ -462,7 +552,7 @@ export default function StudentFeedback() {
                               </p>
                               <p className="text-sm text-gray-800">{comment.comment}</p>
                               <button
-                                onClick={() => askAboutInlineComment(comment)}
+                                onClick={(e) => { e.stopPropagation(); askAboutInlineComment(comment); }}
                                 className="mt-2 flex items-center gap-1 text-xs text-yellow-700 hover:text-yellow-800 hover:bg-yellow-100 px-1.5 py-0.5 rounded"
                               >
                                 <Bot className="w-3 h-3" />

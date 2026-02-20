@@ -4,7 +4,7 @@
  * Provides a drag-and-drop file upload area for students to resubmit work.
  * Collapses by default and expands to show upload controls and status.
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Upload, ChevronDown, ChevronRight, CheckCircle,
   FileText, Trash2, Loader2
@@ -21,6 +21,23 @@ export default function ResubmitPanel({ token }: ResubmitPanelProps) {
   const [resubmitLoading, setResubmitLoading] = useState(false);
   const [resubmitSuccess, setResubmitSuccess] = useState(false);
   const [resubmitError, setResubmitError] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(60);
+
+  useEffect(() => {
+    if (!resubmitSuccess) return;
+    setCountdown(60);
+    const interval = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          window.location.reload();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resubmitSuccess]);
   const [dragActive, setDragActive] = useState(false);
 
   const handleResubmit = async () => {
@@ -80,7 +97,7 @@ export default function ResubmitPanel({ token }: ResubmitPanelProps) {
           <div className="p-6 border-t border-gray-100 space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p className="text-sm text-blue-800">
-                Upload a revised version of your work. Your instructor will review it and may provide updated feedback.
+                Upload a revised version of your work. Updated feedback will be provided.
               </p>
             </div>
 
@@ -88,12 +105,15 @@ export default function ResubmitPanel({ token }: ResubmitPanelProps) {
               <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
                 <CheckCircle className="w-10 h-10 text-green-500 mx-auto mb-3" />
                 <h3 className="font-semibold text-green-900 mb-1">Revision Submitted Successfully</h3>
-                <p className="text-sm text-green-700 mb-4">Your instructor will review your revision and provide updated feedback.</p>
+                <p className="text-sm text-green-700 mb-1">Your revision is being graded — please wait about a minute for updated feedback.</p>
+                <p className="text-sm text-green-600 mb-4">
+                  Page refreshing automatically in <span className="font-semibold">{countdown}s</span>
+                </p>
                 <button
-                  onClick={() => setResubmitSuccess(false)}
+                  onClick={() => window.location.reload()}
                   className="text-sm text-green-700 hover:text-green-800 underline"
                 >
-                  Submit Another Revision
+                  Refresh now
                 </button>
               </div>
             ) : (

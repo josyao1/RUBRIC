@@ -14,6 +14,7 @@ import multer from 'multer';
 import { GoogleGenAI } from '@google/genai';
 import prisma from '../db/prisma.js';
 import { extractTextFromFile } from '../services/textExtraction.js';
+import { processResubmissionFeedback } from '../services/feedbackGeneration.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -294,6 +295,19 @@ router.get('/feedback/:token', async (req, res) => {
       });
     }
 
+    // Find the latest revision (child submission) if any
+    const revisions = await prisma.submission.findMany({
+      where: { parentSubmissionId: submission.id },
+      orderBy: { submittedAt: 'desc' },
+      take: 1,
+      include: {
+        inlineComments: { include: { criterion: { select: { name: true } } } },
+        sectionFeedback: { include: { criterion: { select: { name: true } } } },
+        overallFeedback: true
+      }
+    });
+    const latestRevision = revisions[0] ?? null;
+
     res.json({
       studentName: submission.student?.name,
       assignmentName: submission.assignment?.name,
@@ -301,7 +315,17 @@ router.get('/feedback/:token', async (req, res) => {
       extractedText: submission.extractedText,
       inlineComments: submission.inlineComments,
       sectionFeedback: submission.sectionFeedback,
-      overallFeedback: submission.overallFeedback
+      overallFeedback: submission.overallFeedback,
+      latestRevision: latestRevision ? {
+        id: latestRevision.id,
+        fileName: latestRevision.fileName,
+        status: latestRevision.status,
+        submittedAt: latestRevision.submittedAt,
+        extractedText: latestRevision.extractedText,
+        inlineComments: latestRevision.inlineComments,
+        sectionFeedback: latestRevision.sectionFeedback,
+        overallFeedback: latestRevision.overallFeedback
+      } : null
     });
   } catch (error) {
     console.error('[STUDENTS] Error:', error);
@@ -547,9 +571,14 @@ router.post('/feedback/:token/resubmit', resubmitUpload.single('file'), async (r
 
     console.log(`[STUDENTS] Resubmission created: ${newSubmission.id} for student ${original.student?.name}`);
 
+    // Trigger auto-grading asynchronously (fire-and-forget)
+    processResubmissionFeedback(newSubmission.id).catch(err =>
+      console.error('[RESUBMIT] Auto-grading failed:', err)
+    );
+
     res.json({
       success: true,
-      message: 'Your revision has been submitted. Your instructor will review it and provide updated feedback.',
+      message: 'Your revision has been submitted and is being graded. Check back shortly for updated feedback.',
       submissionId: newSubmission.id
     });
   } catch (error) {
