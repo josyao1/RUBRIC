@@ -163,8 +163,11 @@ function buildInlineCommentsPrompt(
 
   return `You are an experienced educator providing rubric-based feedback. The rubric is your PRIMARY evaluation tool - every comment must connect to a specific rubric criterion and help the student understand how to meet that criterion's expectations.
 
-${teacherPreferences ? `=== TEACHER'S SPECIFIC INSTRUCTIONS ===\n${teacherPreferences}\n\n` : ''}
-=== THE RUBRIC (This is your primary evaluation tool) ===
+${teacherPreferences ? `=== ASSIGNMENT CONTEXT & TEACHER INSTRUCTIONS ===
+Use this to understand what the assignment is about and any specific guidance for feedback.
+${teacherPreferences}
+
+` : ''}=== THE RUBRIC (This is your primary evaluation tool) ===
 ${criteriaDescription}
 
 === YOUR TASK ===
@@ -196,7 +199,7 @@ Return JSON:
   "inlineHighlights": [
     {
       "highlightedText": "exact phrase from submission (3-12 words)",
-      "comment": "Rubric-based feedback: what criterion this relates to, what's expected, what's missing, how to fix it",
+      "comment": "What's weak or missing here, and specifically how to fix it. Do NOT start with the criterion name — it is already shown as a header above the comment.",
       "criterionName": "the exact rubric criterion name this relates to"
     }
   ]
@@ -204,19 +207,21 @@ Return JSON:
 
 === COMMENT QUALITY STANDARDS ===
 Every comment should follow this pattern:
-"[What's wrong per the rubric] → [What the rubric expects] → [How to fix it]"
+"[What's wrong or missing] → [What's expected] → [How to fix it]"
 
-BAD (generic, not rubric-based):
+Do NOT start the comment with the criterion name — it is already displayed as a label above the comment in the UI. Starting with it is redundant.
+
+BAD (repeats criterion name, generic):
+"Historical Knowledge and Use of Evidence → This lacks detail."
 "Unclear"
 "Needs more detail"
-"Awkward phrasing"
 
-GOOD (rubric-grounded):
-"This claim lacks the supporting evidence required by the Evidence criterion. Add a specific example or data point that demonstrates your claim."
+GOOD (jumps straight to the issue and fix):
+"This claim is too vague to support the argument — add a specific example (e.g., the exact land lost or the army size cap) to demonstrate deeper knowledge."
 
-"For the Analysis criterion, you state what happened but not why it matters. After this sentence, add 2-3 sentences explaining the significance."
+"You describe what happened but not why it mattered. Add 2–3 sentences explaining the historical significance of this event."
 
-"The Organization criterion requires clear transitions between ideas. This paragraph jumps topics - add a transition sentence connecting [previous idea] to [new idea]."
+"This paragraph shifts topics without a transition. Add a linking sentence connecting the previous point to this one."
 
 === WHAT TO COMMENT ON ===
 Focus ONLY on issues that relate to the rubric criteria provided. For each criterion, ask:
@@ -254,8 +259,11 @@ function buildSynthesizedFeedbackPrompt(
 
   return `You are an experienced educator providing criterion-based feedback that helps students understand what to improve and how. Your feedback must be grounded in the rubric criteria - use the performance level descriptions to understand what strong work looks like, then guide students toward that standard.
 
-${teacherPreferences ? `=== TEACHER'S SPECIFIC INSTRUCTIONS ===\n${teacherPreferences}\n\n` : ''}
-=== RUBRIC CRITERIA AND PERFORMANCE LEVELS ===
+${teacherPreferences ? `=== ASSIGNMENT CONTEXT & TEACHER INSTRUCTIONS ===
+Use this to understand what the assignment is about and any specific guidance for feedback.
+${teacherPreferences}
+
+` : ''}=== RUBRIC CRITERIA AND PERFORMANCE LEVELS ===
 ${criteriaDescription}
 
 === HOW TO USE THE RUBRIC ===

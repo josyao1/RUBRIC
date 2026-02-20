@@ -8,7 +8,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Users, Plus, Upload, Trash2, Loader2, AlertCircle,
-  FileText, Send, CheckCircle, Copy, ExternalLink, Eye, Clock
+  FileText, Send, CheckCircle, Copy, ExternalLink, Eye, Clock, ArrowLeftRight
 } from 'lucide-react';
 import {
   studentsApi, assignmentsApi, submissionsApi,
@@ -26,6 +26,7 @@ export default function Students() {
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showRelease, setShowRelease] = useState(false);
+  const [reassigningSubmissionId, setReassigningSubmissionId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -295,22 +296,49 @@ export default function Students() {
                       {statusSummary.total === 0 ? (
                         <span className="text-gray-400 italic text-sm">None</span>
                       ) : (
-                        <div className="flex items-center gap-2">
-                          {statusSummary.ready > 0 && (
-                            <span className="flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded-full" title="Feedback ready">
-                              <CheckCircle className="w-3 h-3" /> {statusSummary.ready}
-                            </span>
-                          )}
-                          {statusSummary.pending > 0 && (
-                            <span className="flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full" title="Awaiting feedback">
-                              <Clock className="w-3 h-3" /> {statusSummary.pending}
-                            </span>
-                          )}
-                          {statusSummary.processing > 0 && (
-                            <span className="flex items-center gap-1 text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full" title="Generating feedback">
-                              <Loader2 className="w-3 h-3 animate-spin" /> {statusSummary.processing}
-                            </span>
-                          )}
+                        <div className="space-y-1">
+                          {(student.submissions || []).map(sub => (
+                            <div key={sub.id} className="flex items-center gap-1.5 group">
+                              {/* Status dot */}
+                              {sub.status === 'ready' || sub.status === 'reviewed' ? (
+                                <CheckCircle className="w-3 h-3 text-green-500 shrink-0" />
+                              ) : sub.status === 'processing' ? (
+                                <Loader2 className="w-3 h-3 text-blue-500 animate-spin shrink-0" />
+                              ) : (
+                                <Clock className="w-3 h-3 text-amber-500 shrink-0" />
+                              )}
+                              <span className="text-xs text-gray-600 truncate max-w-[120px]" title={sub.fileName}>
+                                {sub.fileName}
+                              </span>
+                              {/* Reassign button — visible on row hover */}
+                              {reassigningSubmissionId === sub.id ? (
+                                <select
+                                  autoFocus
+                                  className="text-xs border border-forest-400 rounded px-1 py-0.5 text-gray-700 bg-white"
+                                  defaultValue={student.id}
+                                  onChange={(e) => {
+                                    if (e.target.value && e.target.value !== student.id) {
+                                      handleLinkSubmission(sub.id, e.target.value);
+                                    }
+                                    setReassigningSubmissionId(null);
+                                  }}
+                                  onBlur={() => setReassigningSubmissionId(null)}
+                                >
+                                  {students.map(s => (
+                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <button
+                                  onClick={() => setReassigningSubmissionId(sub.id)}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-forest-600"
+                                  title="Reassign to different student"
+                                >
+                                  <ArrowLeftRight className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       )}
                     </td>

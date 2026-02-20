@@ -450,10 +450,6 @@ function StartGradingModal({ assignment, onClose, onStart }: {
         </div>
 
         <div className="bg-gray-50 rounded-lg p-4 mb-4">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Submissions to process:</span>
-            <span className="font-medium text-gray-900">{assignment.submissionCount}</span>
-          </div>
           <div className="flex items-center justify-between text-sm mt-2">
             <span className="text-gray-600">Rubric:</span>
             <span className="font-medium text-gray-900">{assignment.rubricName}</span>
@@ -462,16 +458,16 @@ function StartGradingModal({ assignment, onClose, onStart }: {
 
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Additional Instructions (Optional)
+            Assignment Context & Instructions (Optional)
           </label>
           <textarea
             value={preferences}
             onChange={(e) => setPreferences(e.target.value)}
-            placeholder="Add any specific preferences for feedback generation...&#10;&#10;Examples:&#10;• Focus more on constructive criticism&#10;• Be encouraging with struggling students&#10;• Pay special attention to grammar&#10;• This is a first draft, be gentle"
+            placeholder={"Describe the assignment topic and any feedback preferences. This helps the AI understand context when the rubric alone isn't specific enough.\n\nExamples:\n• This is a Year 9 essay on the causes of World War I\n• Students are analysing the impact of imperialism on colonised nations\n• This is a first draft — be encouraging but honest\n• Pay close attention to use of historical evidence"}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-forest-500 h-32 text-sm resize-none"
           />
           <p className="text-xs text-gray-500 mt-1">
-            These instructions will guide the AI when generating feedback for each submission.
+            Topic context and instructions are passed directly to the AI when generating feedback for each submission.
           </p>
         </div>
 

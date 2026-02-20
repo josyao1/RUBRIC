@@ -56,28 +56,35 @@ Return ONLY valid JSON in this exact format:
 RUBRIC TEXT:
 `;
 
-const VISION_PARSING_PROMPT = `You are an expert at parsing educational rubrics for feedback purposes.
-Look at this rubric image and extract ALL criteria with their performance levels.
-Focus on extracting descriptive feedback guidance, NOT point values.
+const VISION_PARSING_PROMPT = `You are an expert at parsing educational rubric tables.
 
-For each criterion (usually rows in a rubric table), extract:
-- name: The criterion name (e.g., "Thesis Statement", "Evidence", "Organization")
-- description: Brief description of what this criterion evaluates
-- levels: An array of performance levels from HIGHEST to LOWEST (usually columns), each with:
-  - label: The level name (e.g., "Excellent", "Proficient", "Developing", "Beginning")
-  - description: What performance at this level looks like (the cell content) - be detailed
+This is a rubric table. Parse it using this EXACT structure:
+- ROWS = criteria (the things being graded, listed in the leftmost column)
+- COLUMNS = performance levels (the score ranges or labels across the top row)
 
-Return ONLY valid JSON in this exact format:
+For each ROW (criterion), extract ONE criterion with ALL its column descriptions as levels.
+Do NOT create a separate criterion for each cell — each ROW is ONE criterion.
+
+For each criterion extract:
+- name: The criterion name from the leftmost column
+- description: A brief summary of what this criterion evaluates (infer from the descriptions if not stated)
+- levels: One entry per column (left to right, highest to lowest), each with:
+  - label: The column header (e.g., "16-20", "Excellent", "Proficient") — use the exact header text
+  - description: The full cell text for that criterion at that level
+
+Example: a rubric with 4 criteria and 4 level columns should produce exactly 4 criteria each with exactly 4 levels.
+
+Return ONLY valid JSON:
 {
   "criteria": [
     {
       "name": "Thesis Statement",
       "description": "Quality and clarity of the main argument",
       "levels": [
-        {"label": "Excellent", "description": "Clear, specific, and arguable thesis that provides a roadmap for the essay"},
-        {"label": "Good", "description": "Thesis is present and clear but could be more specific or arguable"},
-        {"label": "Developing", "description": "Thesis is vague, too broad, or not clearly stated"},
-        {"label": "Beginning", "description": "No clear thesis statement or main argument"}
+        {"label": "16-20", "description": "Clear, specific, and arguable thesis that provides a roadmap for the essay"},
+        {"label": "11-15", "description": "Thesis is present and clear but could be more specific"},
+        {"label": "6-10", "description": "Thesis is vague or too broad"},
+        {"label": "0-5", "description": "No clear thesis statement"}
       ]
     }
   ]

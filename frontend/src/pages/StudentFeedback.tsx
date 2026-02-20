@@ -10,13 +10,15 @@ import { useParams } from 'react-router-dom';
 import {
   MessageSquare, CheckCircle, TrendingUp, Lightbulb,
   ChevronDown, ChevronRight, Loader2, AlertCircle, FileText,
-  Bot
+  Bot, Download
 } from 'lucide-react';
+import { PDFDownloadLink } from '@react-pdf/renderer';
 import { studentsApi, type SubmissionWithFeedback } from '../services/api';
 import { parseJsonArray } from '../utils/parseJsonArray';
 import HighlightedDocument from '../components/HighlightedDocument';
 import ChatPanel, { type ChatPanelHandle } from '../components/ChatPanel';
 import ResubmitPanel from '../components/ResubmitPanel';
+import FeedbackPDF from '../components/FeedbackPDF';
 
 interface FeedbackData extends SubmissionWithFeedback {
   studentName?: string;
@@ -121,14 +123,42 @@ export default function StudentFeedback() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-4 py-6">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-forest-100 rounded-lg">
-              <MessageSquare className="w-6 h-6 text-forest-600" />
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-forest-100 rounded-lg">
+                <MessageSquare className="w-6 h-6 text-forest-600" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-serif font-semibold text-gray-900">Your Feedback</h1>
+                <p className="text-gray-500">from FeedbackLab</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-serif font-semibold text-gray-900">Your Feedback</h1>
-              <p className="text-gray-500">from FeedbackLab</p>
-            </div>
+            <PDFDownloadLink
+              document={
+                <FeedbackPDF
+                  studentName={feedback.studentName}
+                  assignmentName={feedback.assignmentName}
+                  fileName={feedback.fileName}
+                  overallFeedback={feedback.overallFeedback}
+                  sectionFeedback={feedback.sectionFeedback}
+                  inlineComments={feedback.inlineComments}
+                  extractedText={feedback.extractedText}
+                />
+              }
+              fileName={`feedback-${feedback.studentName?.replace(/\s+/g, '-') || 'student'}-${feedback.assignmentName?.replace(/\s+/g, '-') || 'assignment'}.pdf`}
+            >
+              {({ loading: pdfLoading }) => (
+                <button
+                  className="flex items-center gap-2 px-4 py-2 bg-forest-600 text-white rounded-lg hover:bg-forest-700 text-sm font-medium shrink-0 disabled:opacity-60"
+                  disabled={pdfLoading}
+                >
+                  {pdfLoading
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Preparing PDF...</>
+                    : <><Download className="w-4 h-4" /> Export PDF</>
+                  }
+                </button>
+              )}
+            </PDFDownloadLink>
           </div>
           <div className="flex flex-wrap gap-4 mt-4 text-sm">
             {feedback.studentName && (

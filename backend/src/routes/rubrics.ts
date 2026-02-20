@@ -153,20 +153,11 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         rawContent = readFileSync(filePath, 'utf-8');
         console.log(`[UPLOAD] TXT parsed: ${rawContent.length} characters`);
       } else if (ext === '.pdf') {
-        console.log('[UPLOAD] Parsing PDF file...');
-        const pdfParse = require('pdf-parse');
-        const pdfBuffer = readFileSync(filePath);
-        const pdfData = await pdfParse(pdfBuffer);
-        rawContent = pdfData.text;
-        console.log(`[UPLOAD] PDF text extraction: ${rawContent.trim().length} characters`);
-
-        // If very little text extracted, it's likely a scanned PDF
-        // Mark it for Gemini vision parsing instead
-        if (rawContent.trim().length < 50) {
-          console.log('[UPLOAD] PDF appears to be scanned/image-based');
-          console.log('[UPLOAD] Will use Gemini Vision for parsing');
-          rawContent = '__GEMINI_VISION__'; // Special marker
-        }
+        // Always use Gemini Vision for PDFs — rubrics are typically tables which
+        // pdf-parse reads in scrambled order, causing AI to mis-map level descriptions.
+        // Vision reads the actual visual layout correctly.
+        console.log('[UPLOAD] PDF detected - using Gemini Vision for accurate table parsing');
+        rawContent = '__GEMINI_VISION__';
       } else if (ext === '.docx' || ext === '.doc') {
         console.log('[UPLOAD] Parsing Word document...');
         const mammoth = await import('mammoth');
