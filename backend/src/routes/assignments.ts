@@ -6,10 +6,24 @@
  * status. Mounted at /api/assignments.
  */
 import { Router } from 'express';
+import { randomBytes } from 'crypto';
 import prisma from '../db/prisma.js';
 import { processAssignmentFeedback } from '../services/feedbackGeneration.js';
 
 const router = Router();
+
+const JOIN_CODE_CHARSET = 'ABCDEFGHJKMNPQRSTVWXYZ23456789';
+
+async function generateJoinCode(): Promise<string> {
+  while (true) {
+    const code = Array.from(
+      { length: 6 },
+      () => JOIN_CODE_CHARSET[randomBytes(1)[0] % JOIN_CODE_CHARSET.length]
+    ).join('');
+    const existing = await prisma.assignment.findUnique({ where: { joinCode: code } });
+    if (!existing) return code;
+  }
+}
 
 // Get all assignments with rubric info
 router.get('/', async (req, res) => {
@@ -37,7 +51,8 @@ router.get('/', async (req, res) => {
       submissionCount: a._count.submissions,
       gradingStatus: a.gradingStatus,
       gradingProgress: a.gradingProgress,
-      gradingTotal: a.gradingTotal
+      gradingTotal: a.gradingTotal,
+      joinCode: a.joinCode
     }));
 
     console.log(`[ASSIGNMENTS] Found ${transformed.length} assignments`);
@@ -81,6 +96,7 @@ router.get('/:id', async (req, res) => {
     // Transform submissions to include student name
     const transformed = {
       ...assignment,
+      joinCode: assignment.joinCode,
       rubricName: assignment.rubric?.name || null,
       submissions: assignment.submissions.map(s => ({
         id: s.id,
@@ -114,11 +130,14 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Name is required' });
     }
 
+    const joinCode = await generateJoinCode();
+
     const assignment = await prisma.assignment.create({
       data: {
         name,
         rubricId: rubricId || null,
-        dueDate: dueDate ? new Date(dueDate) : null
+        dueDate: dueDate ? new Date(dueDate) : null,
+        joinCode
       },
       include: {
         rubric: {
@@ -136,7 +155,8 @@ router.post('/', async (req, res) => {
       createdAt: assignment.createdAt,
       rubricId: assignment.rubricId,
       rubricName: assignment.rubric?.name || null,
-      submissionCount: 0
+      submissionCount: 0,
+      joinCode: assignment.joinCode
     });
   } catch (error) {
     console.error('[ASSIGNMENTS] Error:', error);
@@ -148,14 +168,15 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   console.log(`[ASSIGNMENTS] PUT /${req.params.id}`);
   try {
-    const { name, rubricId, dueDate } = req.body;
+    const { name, rubricId, dueDate, teacherPreferences } = req.body;
 
     const assignment = await prisma.assignment.update({
       where: { id: req.params.id },
       data: {
         name,
         rubricId: rubricId || null,
-        dueDate: dueDate ? new Date(dueDate) : null
+        dueDate: dueDate ? new Date(dueDate) : null,
+        ...(teacherPreferences !== undefined && { teacherPreferences: teacherPreferences || null })
       },
       include: {
         rubric: {
@@ -174,6 +195,7 @@ router.put('/:id', async (req, res) => {
       createdAt: assignment.createdAt,
       rubricId: assignment.rubricId,
       rubricName: assignment.rubric?.name || null,
+      teacherPreferences: assignment.teacherPreferences,
       submissionCount: assignment._count.submissions
     });
   } catch (error) {

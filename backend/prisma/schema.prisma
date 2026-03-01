@@ -90,6 +90,7 @@ model Assignment {
   name      String
   dueDate   DateTime?
   createdAt DateTime  @default(now())
+  joinCode  String?   @unique
 
   // Grading pipeline
   gradingStatus      String  @default("idle") // idle, in_progress, completed, error

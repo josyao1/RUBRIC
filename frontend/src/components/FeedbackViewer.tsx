@@ -5,7 +5,7 @@
  * sections with scores, and overall feedback summary. Fetches feedback data
  * on mount and supports collapsible criteria sections.
  */
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   X, Loader2, FileText, MessageSquare, CheckCircle,
   TrendingUp, Lightbulb, ChevronDown, ChevronRight, User
