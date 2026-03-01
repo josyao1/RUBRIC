@@ -346,7 +346,8 @@ export interface SubmissionWithFeedback extends Submission {
   overallFeedback?: OverallFeedback;
 }
 
-export interface LatestRevision {
+// Unified draft/revision shape used by both token-based and join-based flows.
+export interface DraftRevision {
   id: string;
   fileName: string;
   status: string; // 'pending' | 'processing' | 'ready' | 'error'
@@ -356,6 +357,9 @@ export interface LatestRevision {
   sectionFeedback: SectionFeedback[];
   overallFeedback?: OverallFeedback;
 }
+
+/** @deprecated Use DraftRevision */
+export type LatestRevision = DraftRevision;
 
 export const submissionsApi = {
   // Get all submissions
@@ -502,17 +506,6 @@ export interface JoinAssignment {
   assignmentName: string;
   dueDate?: string;
   students: { id: string; name: string }[];
-}
-
-export interface DraftRevision {
-  id: string;
-  status: string;
-  fileName: string;
-  submittedAt: string;
-  extractedText?: string;
-  inlineComments: InlineComment[];
-  sectionFeedback: SectionFeedback[];
-  overallFeedback?: OverallFeedback;
 }
 
 export interface JoinSubmissionStatus {

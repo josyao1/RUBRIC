@@ -413,6 +413,15 @@ export default function StudentWorkspace() {
     return [...displaySub.inlineComments].sort((a, b) => a.startPosition - b.startPosition);
   }, [displaySub]);
 
+  // Pre-parsed overall feedback lists — avoids repeated JSON.parse on every render.
+  const overallParsed = useMemo(() => {
+    if (!displaySub?.overallFeedback) return null;
+    return {
+      improvements: parseJsonArray(displaySub.overallFeedback.priorityImprovements),
+      nextSteps: parseJsonArray(displaySub.overallFeedback.nextSteps),
+    };
+  }, [displaySub]);
+
   // Compute highlight ranges for the editor overlay. Searches for each unresolved
   // comment's highlighted text in the current draft, merges overlapping ranges.
   const editorHighlightSegments = useMemo(() => {
@@ -421,8 +430,14 @@ export default function StudentWorkspace() {
     const ranges: { start: number; end: number }[] = [];
     for (const c of sortedComments) {
       if (resolvedCommentIds.has(c.id)) continue;
-      const idx = draftText.indexOf(c.highlightedText);
-      if (idx !== -1) ranges.push({ start: idx, end: idx + c.highlightedText.length });
+      // Prefer the original anchored position if the text hasn't moved
+      if (draftText.slice(c.startPosition, c.endPosition) === c.highlightedText) {
+        ranges.push({ start: c.startPosition, end: c.endPosition });
+      } else {
+        // Fall back to first occurrence search after editing
+        const idx = draftText.indexOf(c.highlightedText);
+        if (idx !== -1) ranges.push({ start: idx, end: idx + c.highlightedText.length });
+      }
     }
     if (ranges.length === 0) return null;
     ranges.sort((a, b) => a.start - b.start);
@@ -695,20 +710,20 @@ export default function StudentWorkspace() {
           {/* Overall tab — read-only */}
           {editorTab === 'overall' && (
             <div className="flex-1 overflow-auto p-6">
-              {!displaySub.overallFeedback ? (
+              {!displaySub.overallFeedback || !overallParsed ? (
                 <div className="text-center py-16 text-gray-400">No overall feedback available.</div>
               ) : (
                 <div className="max-w-3xl mx-auto space-y-4">
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-gray-800 leading-relaxed">{displaySub.overallFeedback.summary}</p>
                   </div>
-                  {parseJsonArray(displaySub.overallFeedback.priorityImprovements).length > 0 && (
+                  {overallParsed.improvements.length > 0 && (
                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
                       <h3 className="font-semibold text-amber-900 flex items-center gap-2 mb-3">
                         <TrendingUp className="w-4 h-4" /> Priority Improvements
                       </h3>
                       <ol className="space-y-2">
-                        {parseJsonArray(displaySub.overallFeedback.priorityImprovements).map((item, i) => (
+                        {overallParsed.improvements.map((item, i) => (
                           <li key={i} className="flex gap-3 text-sm text-amber-800">
                             <span className="font-bold text-amber-500 flex-shrink-0">{i + 1}.</span>
                             <span>{item}</span>
@@ -717,13 +732,13 @@ export default function StudentWorkspace() {
                       </ol>
                     </div>
                   )}
-                  {parseJsonArray(displaySub.overallFeedback.nextSteps).length > 0 && (
+                  {overallParsed.nextSteps.length > 0 && (
                     <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
                       <h3 className="font-semibold text-blue-900 flex items-center gap-2 mb-3">
                         <Lightbulb className="w-4 h-4" /> Next Steps
                       </h3>
                       <ol className="space-y-2">
-                        {parseJsonArray(displaySub.overallFeedback.nextSteps).map((item, i) => (
+                        {overallParsed.nextSteps.map((item, i) => (
                           <li key={i} className="flex gap-3 text-sm text-blue-800">
                             <span className="font-bold text-blue-400 flex-shrink-0">{i + 1}.</span>
                             <span>{item}</span>
@@ -991,7 +1006,7 @@ export default function StudentWorkspace() {
               </div>
 
               {/* Overall tab */}
-              {activeTab === 'overall' && displaySub.overallFeedback && (
+              {activeTab === 'overall' && displaySub.overallFeedback && overallParsed && (
                 <div className="space-y-4">
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <div className="flex items-start justify-between gap-4">
@@ -1005,21 +1020,21 @@ export default function StudentWorkspace() {
                     </div>
                   </div>
 
-                  {parseJsonArray(displaySub.overallFeedback.priorityImprovements).length > 0 && (
+                  {overallParsed.improvements.length > 0 && (
                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
                       <div className="flex items-start justify-between gap-4 mb-3">
                         <h3 className="font-semibold text-amber-900 flex items-center gap-2">
                           <TrendingUp className="w-4 h-4" /> Priority Improvements
                         </h3>
                         <button
-                          onClick={() => askAboutOverall('improvements', parseJsonArray(displaySub.overallFeedback!.priorityImprovements))}
+                          onClick={() => askAboutOverall('improvements', overallParsed.improvements)}
                           className="flex-shrink-0 flex items-center gap-1 text-xs text-amber-700 hover:bg-amber-100 px-2 py-1 rounded"
                         >
                           <Bot className="w-3 h-3" /> Ask
                         </button>
                       </div>
                       <ol className="space-y-2">
-                        {parseJsonArray(displaySub.overallFeedback.priorityImprovements).map((item, i) => (
+                        {overallParsed.improvements.map((item, i) => (
                           <li key={i} className="flex gap-3 text-sm text-amber-800">
                             <span className="font-bold text-amber-500 flex-shrink-0">{i + 1}.</span>
                             <span>{item}</span>
@@ -1029,21 +1044,21 @@ export default function StudentWorkspace() {
                     </div>
                   )}
 
-                  {parseJsonArray(displaySub.overallFeedback.nextSteps).length > 0 && (
+                  {overallParsed.nextSteps.length > 0 && (
                     <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
                       <div className="flex items-start justify-between gap-4 mb-3">
                         <h3 className="font-semibold text-blue-900 flex items-center gap-2">
                           <Lightbulb className="w-4 h-4" /> Next Steps
                         </h3>
                         <button
-                          onClick={() => askAboutOverall('nextSteps', parseJsonArray(displaySub.overallFeedback!.nextSteps))}
+                          onClick={() => askAboutOverall('nextSteps', overallParsed.nextSteps)}
                           className="flex-shrink-0 flex items-center gap-1 text-xs text-blue-700 hover:bg-blue-100 px-2 py-1 rounded"
                         >
                           <Bot className="w-3 h-3" /> Ask
                         </button>
                       </div>
                       <ol className="space-y-2">
-                        {parseJsonArray(displaySub.overallFeedback.nextSteps).map((item, i) => (
+                        {overallParsed.nextSteps.map((item, i) => (
                           <li key={i} className="flex gap-3 text-sm text-blue-800">
                             <span className="font-bold text-blue-400 flex-shrink-0">{i + 1}.</span>
                             <span>{item}</span>

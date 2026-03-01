@@ -5,7 +5,7 @@
  * their feedback. Uses forwardRef and useImperativeHandle to expose a
  * sendMessage method so parent components can trigger messages externally.
  */
-import { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { useState, useRef, useEffect, useImperativeHandle, useCallback, forwardRef } from 'react';
 import { Bot, X, Send, Loader2, AlertCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -31,7 +31,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({ onChat }, ref) 
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, chatLoading]);
 
-  const sendChatMessage = async (messageOverride?: string) => {
+  const sendChatMessage = useCallback(async (messageOverride?: string) => {
     const messageToSend = messageOverride || chatInput.trim();
     if (!messageToSend || chatLoading) return;
 
@@ -53,13 +53,11 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({ onChat }, ref) 
     } finally {
       setChatLoading(false);
     }
-  };
+  }, [chatInput, chatLoading, chatMessages, chatOpen, onChat]);
 
   useImperativeHandle(ref, () => ({
-    sendMessage: (msg: string) => {
-      sendChatMessage(msg);
-    },
-  }));
+    sendMessage: (msg: string) => sendChatMessage(msg),
+  }), [sendChatMessage]);
 
   return (
     <>
