@@ -11,16 +11,14 @@ import {
   Settings,
   BookOpen,
   MessageSquare,
-  Users
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/rubrics', icon: FileText, label: 'Rubrics' },
-  { to: '/assignments', icon: BookOpen, label: 'Assignments' },
-  { to: '/students', icon: Users, label: 'Students' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+  { to: '/teacher', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/teacher/rubrics', icon: FileText, label: 'Rubrics' },
+  { to: '/teacher/assignments', icon: BookOpen, label: 'Assignments' },
+  { to: '/teacher/settings', icon: Settings, label: 'Settings' },
 ];
 
 export default function Layout() {
@@ -42,7 +40,7 @@ export default function Layout() {
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.to === '/'}
+              end={item.to === '/teacher'}
               className={({ isActive }) =>
                 `flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
                   isActive

@@ -5,7 +5,7 @@
  * per-criteria scores, and a highlighted document view with inline comments.
  * Includes a ChatPanel for asking questions and a ResubmitPanel for revisions.
  */
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   MessageSquare, CheckCircle, TrendingUp, Lightbulb,
@@ -582,7 +582,10 @@ export default function StudentFeedback() {
       </footer>
 
       {/* Chat */}
-      <ChatPanel ref={chatRef} token={token!} />
+      <ChatPanel
+        ref={chatRef}
+        onChat={(msg, hist) => studentsApi.chatAboutFeedback(token!, msg, hist).then(r => r.response)}
+      />
     </div>
   );
 }

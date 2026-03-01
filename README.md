@@ -1,6 +1,6 @@
 # FeedbackLab
 
-AI-powered rubric-based feedback for student work. Teachers upload a rubric, students submit work, and Gemini AI generates detailed inline and criterion-by-criterion feedback. Students access their feedback via a shareable magic link and can ask the AI follow-up questions.
+AI-powered rubric-based feedback for student work. Teachers create an assignment and share a join code. Students join via the code, upload their own work, and feedback auto-generates immediately — no manual release step required.
 
 ## Requirements
 
@@ -19,10 +19,10 @@ cd ../backend && npm install
 # 2. Configure environment
 cd backend
 cp .env.example .env
-# Edit .env — set GEMINI_API_KEY and optionally DATABASE_URL
+# Edit .env — set GEMINI_API_KEY
 
 # 3. Initialize database
-npx prisma db push
+cd backend && npx prisma db push
 ```
 
 ## Run
@@ -37,20 +37,35 @@ cd backend && npm run dev
 cd frontend && npm run dev
 ```
 
-Open http://localhost:5173
+Open http://localhost:5173 — redirects to `/teacher`
 
 ## Workflow
 
-1. **Create a Rubric** — Define grading criteria manually, or upload a PDF/DOCX/image and let AI parse it. Also get feedback on rubric if desired
-2. **Create an Assignment** — Name it and link it to a rubric
-3. **Upload Submissions** — Add student work (PDF, DOCX, images, plain text, code files); text is extracted automatically
-4. **Generate Feedback** — AI reads each submission against the rubric and produces:
-   - 5–8 inline comments highlighting specific passages
-   - Per-criterion feedback (strengths, areas for growth, suggestions)
-   - An overall summary with priority improvements and next steps
-5. **Review Feedback** — Optionally review AI output before releasing
-6. **Release to Students** — Each student gets a unique magic link; no login required
-7. **Student Portal** — Students view feedback in three tabs (Overall / By Criteria / Document), and can chat with the AI tutor about any comment
+### Teacher
+1. **Create a Rubric** — Define grading criteria manually, or upload a PDF/DOCX/image for AI parsing
+2. **Create an Assignment** — Link it to a rubric; a 6-character join code is auto-generated (e.g. `R7K3MX`)
+3. **Share the code** — Students go to `/student` and enter the code
+4. **Monitor** — The assignment detail view auto-populates as students join and submit
+
+### Student
+1. Go to `/student`, enter the join code
+2. Pick your name from the list (or add yourself)
+3. Upload your essay — feedback generates automatically (~30–60s)
+4. View feedback in three tabs: Overall / By Criteria / Document with inline comments
+5. Submit a revision to get comparative feedback
+
+## Routes
+
+| Path | Who | Description |
+|---|---|---|
+| `/teacher` | Teacher | Dashboard |
+| `/teacher/rubrics` | Teacher | Rubric management |
+| `/teacher/assignments` | Teacher | Assignment management + join codes |
+| `/teacher/settings` | Teacher | Settings |
+| `/student` | Student | Enter join code |
+| `/student/:code` | Student | Identity picker |
+| `/student/:code/:studentId` | Student | Workspace — upload, view feedback, resubmit |
+| `/feedback/:token` | Student | Legacy magic-link access (still works) |
 
 ## Tech Stack
 
@@ -71,18 +86,39 @@ Open http://localhost:5173
 RUBRIC/
 ├── frontend/          React SPA (port 5173)
 │   └── src/
-│       ├── pages/     Dashboard, Rubrics, Assignments, Students, StudentFeedback
-│       ├── components/Layout, FeedbackViewer, ChatPanel, HighlightedDocument, ...
-│       ├── services/  api.ts — typed client for all backend routes
-│       └── types/     Shared TypeScript interfaces
+│       ├── pages/
+│       │   ├── Dashboard.tsx         Teacher stats overview
+│       │   ├── Rubrics.tsx           Rubric create/edit/AI parse
+│       │   ├── Assignments.tsx       Assignment management + join codes
+│       │   ├── Settings.tsx          Settings placeholder
+│       │   ├── StudentPortal.tsx     Join code entry + identity picker
+│       │   ├── StudentWorkspace.tsx  Student upload + feedback view
+│       │   └── StudentFeedback.tsx   Legacy magic-link feedback page
+│       ├── components/
+│       │   ├── Layout.tsx            Teacher sidebar shell
+│       │   ├── FeedbackViewer.tsx    3-tab feedback modal (teacher view)
+│       │   ├── HighlightedDocument.tsx  Inline comment highlights
+│       │   ├── ChatPanel.tsx         AI chat (magic-link flow)
+│       │   ├── ResubmitPanel.tsx     Revision upload (magic-link flow)
+│       │   ├── FeedbackCards.tsx     Per-criterion feedback cards
+│       │   ├── FeedbackPDF.tsx       PDF export
+│       │   └── RubricFeedbackTab.tsx Rubric quality feedback
+│       └── services/api.ts           Typed API client
 │
 ├── backend/           Express API (port 3001)
 │   └── src/
-│       ├── routes/    rubrics.ts, assignments.ts, submissions.ts, students.ts
-│       ├── services/  feedbackGeneration.ts, aiParsing.ts, textExtraction.ts
-│       └── db/        prisma.ts (database client)
-│   └── prisma/
-│       └── schema.prisma   11 models: Rubric, Criterion, Assignment, Submission, ...
+│       ├── routes/
+│       │   ├── rubrics.ts        CRUD + AI rubric parsing
+│       │   ├── assignments.ts    CRUD + grading pipeline + join codes
+│       │   ├── submissions.ts    File upload + text extraction
+│       │   ├── students.ts       Student CRUD + magic-link endpoints + chat
+│       │   └── join.ts           Student self-service endpoints (/api/join)
+│       ├── services/
+│       │   ├── feedbackGeneration.ts  Core AI grading logic
+│       │   ├── aiParsing.ts           Rubric parsing from documents
+│       │   └── textExtraction.ts      PDF/DOCX/image/text extraction
+│       └── db/prisma.ts              Singleton Prisma client
+│   └── prisma/schema.prisma          DB models
 │
 ├── README.md
 ├── context.txt        LLM-oriented codebase guide
@@ -96,16 +132,18 @@ RUBRIC/
 npx prisma db push       # Apply schema changes
 npx prisma generate      # Regenerate client after schema edits
 npx prisma studio        # Browse data in browser UI
+
+# Fresh rebuild (wipes data):
+rm -f prisma/dev.db && npx prisma db push
 ```
 
 ## Supported File Types
 
-Student submissions and rubric uploads accept:
 - Documents: `.pdf`, `.docx`, `.doc`
 - Images: `.png`, `.jpg`, `.jpeg`, `.webp` (OCR via Tesseract)
 - Code/text: `.txt`, `.py`, `.js`, `.ts`, `.java`, `.cpp`, `.c`, `.html`, `.css`, `.md`
 
-Max file size: 50 MB per file, up to 100 files per upload.
+Max file size: 50 MB per file.
 
 ## Environment Variables
 

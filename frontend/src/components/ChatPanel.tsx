@@ -5,19 +5,18 @@
  * their feedback. Uses forwardRef and useImperativeHandle to expose a
  * sendMessage method so parent components can trigger messages externally.
  */
-import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { Bot, X, Send, Loader2, AlertCircle } from 'lucide-react';
-import { studentsApi } from '../services/api';
 
 export interface ChatPanelHandle {
   sendMessage: (msg: string) => void;
 }
 
 interface ChatPanelProps {
-  token: string;
+  onChat: (message: string, history: { role: string; content: string }[]) => Promise<string>;
 }
 
-const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({ token }, ref) => {
+const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({ onChat }, ref) => {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<{ role: string; content: string }[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -32,7 +31,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({ token }, ref) =
 
   const sendChatMessage = async (messageOverride?: string) => {
     const messageToSend = messageOverride || chatInput.trim();
-    if (!messageToSend || chatLoading || !token) return;
+    if (!messageToSend || chatLoading) return;
 
     if (!messageOverride) setChatInput('');
     setChatError(null);
@@ -45,8 +44,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({ token }, ref) =
     if (!chatOpen) setChatOpen(true);
 
     try {
-      const result = await studentsApi.chatAboutFeedback(token, messageToSend, chatMessages);
-      setChatMessages(prev => [...prev, { role: 'assistant', content: result.response }]);
+      const response = await onChat(messageToSend, chatMessages);
+      setChatMessages(prev => [...prev, { role: 'assistant', content: response }]);
     } catch (err) {
       setChatError(err instanceof Error ? err.message : 'Failed to get response');
     } finally {

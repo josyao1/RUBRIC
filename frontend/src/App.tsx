@@ -1,36 +1,45 @@
 /**
- * App — Top-level routing and auth-gated layout
+ * App — Top-level routing
  *
- * Wraps the app in AuthProvider and defines all routes. Authenticated routes
- * render inside the Layout shell; the student feedback page is a standalone
- * public route accessible via magic link.
+ * Teacher routes live under /teacher with a sidebar layout.
+ * Student portal lives under /student (no sidebar).
+ * Magic links at /feedback/:token remain unchanged.
+ * Root redirects to /teacher.
  */
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Rubrics from './pages/Rubrics';
 import Assignments from './pages/Assignments';
-import Students from './pages/Students';
 import StudentFeedback from './pages/StudentFeedback';
 import Settings from './pages/Settings';
+import StudentPortal from './pages/StudentPortal';
+import StudentWorkspace from './pages/StudentWorkspace';
 
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Public route for students to view feedback */}
+          {/* Backwards-compat magic links */}
           <Route path="/feedback/:token" element={<StudentFeedback />} />
 
-          {/* Teacher routes with layout */}
-          <Route path="/" element={<Layout />}>
+          {/* Student portal — no sidebar */}
+          <Route path="/student" element={<StudentPortal />} />
+          <Route path="/student/:code" element={<StudentPortal />} />
+          <Route path="/student/:code/:studentId" element={<StudentWorkspace />} />
+
+          {/* Teacher routes with sidebar */}
+          <Route path="/teacher" element={<Layout />}>
             <Route index element={<Dashboard />} />
             <Route path="rubrics" element={<Rubrics />} />
             <Route path="assignments" element={<Assignments />} />
-            <Route path="students" element={<Students />} />
             <Route path="settings" element={<Settings />} />
           </Route>
+
+          {/* Root redirect */}
+          <Route path="/" element={<Navigate to="/teacher" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

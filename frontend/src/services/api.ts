@@ -179,10 +179,12 @@ export interface Assignment {
   createdAt: string;
   rubricId?: string;
   rubricName?: string;
+  teacherPreferences?: string | null;
   submissionCount: number;
   gradingStatus: 'idle' | 'in_progress' | 'completed' | 'error';
   gradingProgress: number;
   gradingTotal: number;
+  joinCode?: string;
 }
 
 export interface AssignmentSubmission {
@@ -216,6 +218,7 @@ export interface CreateAssignmentData {
   name: string;
   rubricId?: string;
   dueDate?: string;
+  teacherPreferences?: string;
 }
 
 export interface GradingStatus {
@@ -488,6 +491,88 @@ export const studentsApi = {
 
     return response.json();
   },
+};
+
+// ============================================================================
+// JOIN API (student self-service)
+// ============================================================================
+
+export interface JoinAssignment {
+  assignmentId: string;
+  assignmentName: string;
+  dueDate?: string;
+  students: { id: string; name: string }[];
+}
+
+export interface JoinSubmissionStatus {
+  hasSubmission: boolean;
+  assignmentName: string;
+  studentName?: string;
+  submission?: {
+    id: string;
+    status: string;
+    fileName: string;
+    extractedText?: string;
+    submittedAt: string;
+    inlineComments: InlineComment[];
+    sectionFeedback: SectionFeedback[];
+    overallFeedback?: OverallFeedback;
+    latestRevision?: {
+      id: string;
+      status: string;
+      fileName: string;
+      submittedAt: string;
+      extractedText?: string;
+      inlineComments: InlineComment[];
+      sectionFeedback: SectionFeedback[];
+      overallFeedback?: OverallFeedback;
+    } | null;
+  };
+}
+
+export const joinApi = {
+  getAssignment: (code: string) =>
+    fetchApi<JoinAssignment>(`/join/${code.toUpperCase()}`),
+
+  createStudent: (code: string, name: string) =>
+    fetchApi<{ id: string; name: string }>(`/join/${code.toUpperCase()}/students`, {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+
+  submitFile: async (code: string, studentId: string, file: File) => {
+    const url = `${API_BASE}/join/${code.toUpperCase()}/submit`;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('studentId', studentId);
+    const response = await fetch(url, { method: 'POST', body: formData });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Upload failed' }));
+      throw new Error(error.error || 'Upload failed');
+    }
+    return response.json() as Promise<{ submissionId: string }>;
+  },
+
+  getStudentSubmission: (code: string, studentId: string) =>
+    fetchApi<JoinSubmissionStatus>(`/join/${code.toUpperCase()}/student/${studentId}`),
+
+  resubmit: async (code: string, studentId: string, file: File) => {
+    const url = `${API_BASE}/join/${code.toUpperCase()}/student/${studentId}/resubmit`;
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(url, { method: 'POST', body: formData });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Upload failed' }));
+      throw new Error(error.error || 'Upload failed');
+    }
+    return response.json() as Promise<{ submissionId: string }>;
+  },
+
+  chat: (code: string, studentId: string, message: string, history: { role: string; content: string }[]) =>
+    fetchApi<{ response: string }>(`/join/${code.toUpperCase()}/student/${studentId}/chat`, {
+      method: 'POST',
+      body: JSON.stringify({ message, history }),
+    }),
 };
 
 // ============================================================================

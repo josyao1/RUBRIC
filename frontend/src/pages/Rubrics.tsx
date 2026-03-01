@@ -6,7 +6,7 @@
  * AI feedback via the RubricFeedbackTab.
  */
 import { useState, useCallback, useEffect } from 'react';
-import { Plus, Upload, FileText, Trash2, GripVertical, Loader2, AlertCircle, Eye, Image, MessageSquare, Sparkles } from 'lucide-react';
+import { Plus, Upload, FileText, Trash2, GripVertical, Loader2, AlertCircle, Eye, Image, MessageSquare } from 'lucide-react';
 import { rubricsApi, getFileUrl, type Rubric, type Criterion } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import RubricFeedbackTab from '../components/RubricFeedbackTab';
