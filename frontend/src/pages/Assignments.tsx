@@ -8,11 +8,11 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Plus, BookOpen, Calendar, FileText, Trash2, Loader2, AlertCircle,
-  CheckCircle, XCircle, X, Clock, Eye, Edit3, Save,
-  RefreshCw, Copy
+  CheckCircle, XCircle, X, Eye, Edit3, Save,
+  Copy, Users
 } from 'lucide-react';
 import {
-  assignmentsApi, rubricsApi,
+  assignmentsApi, rubricsApi, studentsApi,
   type Assignment, type AssignmentDetail, type Rubric
 } from '../services/api';
 import FeedbackViewer from '../components/FeedbackViewer';
@@ -375,12 +375,21 @@ function AssignmentDetailModal({ assignmentId, onClose, onUpdate }: {
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [saving, setSaving] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [viewingSubmissionId, setViewingSubmissionId] = useState<string | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
   const [prefsText, setPrefsText] = useState('');
   const [prefsSaving, setPrefsSaving] = useState(false);
   const [prefsSaved, setPrefsSaved] = useState(false);
+  const [subTab, setSubTab] = useState<'submissions' | 'students'>('submissions');
+
+  // Students tab state
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [editingStudentName, setEditingStudentName] = useState('');
+  const [savingStudent, setSavingStudent] = useState(false);
+  const [addingStudent, setAddingStudent] = useState(false);
+  const [newStudentName, setNewStudentName] = useState('');
+  const [addingStudentSaving, setAddingStudentSaving] = useState(false);
+
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -427,25 +436,6 @@ function AssignmentDetailModal({ assignmentId, onClose, onUpdate }: {
     }
   };
 
-  const handleRegradeSelected = async () => {
-    if (!assignment || selectedIds.size === 0) return;
-    try {
-      await assignmentsApi.regradeSelected(assignmentId, Array.from(selectedIds));
-      setAssignment({
-        ...assignment,
-        gradingStatus: 'in_progress',
-        gradingProgress: 0,
-        gradingTotal: selectedIds.size,
-        submissions: assignment.submissions.map(s =>
-          selectedIds.has(s.id) ? { ...s, status: 'processing' as const } : s
-        )
-      });
-      setSelectedIds(new Set());
-      onUpdate({ id: assignmentId, gradingStatus: 'in_progress', gradingProgress: 0, gradingTotal: selectedIds.size } as any);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start regrade');
-    }
-  };
 
   const copyCode = () => {
     if (assignment?.joinCode) {
@@ -468,34 +458,47 @@ function AssignmentDetailModal({ assignmentId, onClose, onUpdate }: {
     }
   };
 
-  const toggleSelect = (id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
 
-  const toggleSelectAll = () => {
-    if (!assignment) return;
-    if (selectedIds.size === assignment.submissions.length) setSelectedIds(new Set());
-    else setSelectedIds(new Set(assignment.submissions.map(s => s.id)));
-  };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'ready': case 'reviewed': return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'processing': return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />;
-      default: return <Clock className="w-4 h-4 text-amber-500" />;
+  const handleRenameStudent = async (studentId: string) => {
+    if (!editingStudentName.trim() || !assignment) return;
+    setSavingStudent(true);
+    try {
+      await studentsApi.update(studentId, { name: editingStudentName.trim() });
+      setAssignment({
+        ...assignment,
+        submissions: assignment.submissions.map(s =>
+          s.studentId === studentId ? { ...s, studentName: editingStudentName.trim() } : s
+        )
+      });
+      setEditingStudentId(null);
+    } catch { /* ignore */ } finally {
+      setSavingStudent(false);
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'ready': return 'Ready';
-      case 'reviewed': return 'Reviewed';
-      case 'processing': return 'Processing';
-      default: return 'Pending';
+  const handleDeleteStudent = async (studentId: string) => {
+    if (!assignment || !confirm('Delete this student and all their submissions?')) return;
+    try {
+      await studentsApi.delete(studentId);
+      setAssignment({
+        ...assignment,
+        submissions: assignment.submissions.filter(s => s.studentId !== studentId)
+      });
+    } catch { /* ignore */ }
+  };
+
+  const handleAddStudent = async () => {
+    if (!newStudentName.trim() || !assignment) return;
+    setAddingStudentSaving(true);
+    try {
+      await studentsApi.create({ name: newStudentName.trim() });
+      setNewStudentName('');
+      setAddingStudent(false);
+      // Refresh to pick up the new student if they submit
+      await loadAssignment();
+    } catch { /* ignore */ } finally {
+      setAddingStudentSaving(false);
     }
   };
 
@@ -523,8 +526,24 @@ function AssignmentDetailModal({ assignmentId, onClose, onUpdate }: {
 
   if (!assignment) return null;
 
-  // Only show root submissions (non-revisions)
+  // Only show root submissions (non-revisions), sorted by student name
   const rootSubmissions = assignment.submissions.filter(s => !s.parentSubmissionId);
+  const sortedSubmissions = [...rootSubmissions].sort((a, b) =>
+    (a.studentName || '').toLowerCase().localeCompare((b.studentName || '').toLowerCase())
+  );
+
+  // Unique students derived from submissions
+  const uniqueStudents = (() => {
+    const seen = new Set<string>();
+    const result: { id: string; name: string }[] = [];
+    for (const s of rootSubmissions) {
+      if (s.studentId && !seen.has(s.studentId)) {
+        seen.add(s.studentId);
+        result.push({ id: s.studentId, name: s.studentName || 'Unknown' });
+      }
+    }
+    return result.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+  })();
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -659,90 +678,172 @@ function AssignmentDetailModal({ assignmentId, onClose, onUpdate }: {
           </div>
         )}
 
-        {/* Submissions list */}
-        <div className="flex-1 overflow-auto p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-medium text-gray-700">
-              Student Submissions ({rootSubmissions.length})
-            </h3>
-            {selectedIds.size > 0 && assignment.rubricName && assignment.gradingStatus !== 'in_progress' && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">{selectedIds.size} selected</span>
-                <button
-                  onClick={() => setSelectedIds(new Set())}
-                  className="text-sm text-gray-500 hover:text-gray-700"
-                >
-                  Clear
-                </button>
-                <button
-                  onClick={handleRegradeSelected}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-forest-600 text-white rounded-lg hover:bg-forest-700 text-sm"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  Regenerate ({selectedIds.size})
-                </button>
-              </div>
-            )}
-          </div>
+        {/* Subtabs */}
+        <div className="flex border-b border-gray-200 px-4 pt-1">
+          <button
+            onClick={() => setSubTab('submissions')}
+            className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              subTab === 'submissions'
+                ? 'border-forest-600 text-forest-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            Submissions ({rootSubmissions.length})
+          </button>
+          <button
+            onClick={() => setSubTab('students')}
+            className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              subTab === 'students'
+                ? 'border-forest-600 text-forest-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            Students ({uniqueStudents.length})
+          </button>
+        </div>
 
-          {rootSubmissions.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <BookOpen className="w-10 h-10 mx-auto mb-3 text-gray-300" />
-              <p className="font-medium text-gray-700 mb-1">No submissions yet</p>
-              <p className="text-sm">Share the join code above with your students</p>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {/* Header row */}
-              <div className="flex items-center gap-3 px-3 py-2 text-xs text-gray-500 border-b border-gray-100">
-                <input
-                  type="checkbox"
-                  checked={selectedIds.size === rootSubmissions.length && rootSubmissions.length > 0}
-                  onChange={toggleSelectAll}
-                  className="rounded border-gray-300 text-forest-600 focus:ring-forest-500"
-                />
-                <span className="flex-1">Student / File</span>
-                <span className="w-24 text-center">Status</span>
-                <span className="w-16"></span>
+        {/* Submissions tab */}
+        {subTab === 'submissions' && (
+          <div className="flex-1 overflow-auto p-4">
+            {rootSubmissions.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <BookOpen className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+                <p className="font-medium text-gray-700 mb-1">No submissions yet</p>
+                <p className="text-sm">Share the join code above with your students</p>
               </div>
-
-              {rootSubmissions.map((sub) => (
-                <div
-                  key={sub.id}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors ${selectedIds.has(sub.id) ? 'bg-forest-50/50' : ''}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(sub.id)}
-                    onChange={() => toggleSelect(sub.id)}
-                    className="rounded border-gray-300 text-forest-600 focus:ring-forest-500"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {sub.studentName || <span className="text-gray-400 italic">Unknown</span>}
-                    </p>
-                    <p className="text-xs text-gray-400 truncate">{sub.fileName}</p>
-                  </div>
-                  <div className="w-24 flex items-center justify-center gap-1.5">
-                    {getStatusIcon(sub.status)}
-                    <span className="text-xs text-gray-600">{getStatusLabel(sub.status)}</span>
-                  </div>
-                  <div className="w-16 flex items-center justify-end">
+            ) : (
+              <div className="space-y-1">
+                {sortedSubmissions.map((sub) => (
+                  <div
+                    key={sub.id}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {sub.studentName || <span className="text-gray-400 italic">Unknown</span>}
+                      </p>
+                      <p className="text-xs text-gray-400 truncate">{sub.fileName}</p>
+                    </div>
+                    {(sub.status === 'processing' || sub.status === 'pending') && (
+                      <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin flex-shrink-0" />
+                    )}
                     {(sub.status === 'ready' || sub.status === 'reviewed') && (
                       <button
                         onClick={() => setViewingSubmissionId(sub.id)}
-                        className="p-1 text-forest-600 hover:bg-forest-50 rounded"
+                        className="p-1 text-forest-600 hover:bg-forest-50 rounded flex-shrink-0"
                         title="View feedback"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
                     )}
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Students tab */}
+        {subTab === 'students' && (
+          <div className="flex-1 overflow-auto p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span />
+              <button
+                onClick={() => { setAddingStudent(true); setNewStudentName(''); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-forest-600 text-white rounded-lg hover:bg-forest-700 text-sm"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add Student
+              </button>
             </div>
-          )}
-        </div>
+
+            {addingStudent && (
+              <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-forest-50 border border-forest-200 rounded-lg">
+                <input
+                  type="text"
+                  value={newStudentName}
+                  onChange={(e) => setNewStudentName(e.target.value)}
+                  placeholder="Student name"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAddStudent();
+                    if (e.key === 'Escape') setAddingStudent(false);
+                  }}
+                  className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-forest-500"
+                />
+                <button
+                  onClick={handleAddStudent}
+                  disabled={!newStudentName.trim() || addingStudentSaving}
+                  className="px-3 py-1 bg-forest-600 text-white rounded text-sm hover:bg-forest-700 disabled:opacity-50"
+                >
+                  {addingStudentSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Add'}
+                </button>
+                <button onClick={() => setAddingStudent(false)} className="p-1 text-gray-400 hover:text-gray-600">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {uniqueStudents.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <Users className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+                <p className="font-medium text-gray-700 mb-1">No students yet</p>
+                <p className="text-sm">Students appear here once they join via the code</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {uniqueStudents.map((student) => (
+                  <div key={student.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50">
+                    {editingStudentId === student.id ? (
+                      <>
+                        <input
+                          type="text"
+                          value={editingStudentName}
+                          onChange={(e) => setEditingStudentName(e.target.value)}
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleRenameStudent(student.id);
+                            if (e.key === 'Escape') setEditingStudentId(null);
+                          }}
+                          className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-forest-500"
+                        />
+                        <button
+                          onClick={() => handleRenameStudent(student.id)}
+                          disabled={!editingStudentName.trim() || savingStudent}
+                          className="p-1 text-green-600 hover:bg-green-50 rounded disabled:opacity-50"
+                        >
+                          {savingStudent ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        </button>
+                        <button onClick={() => setEditingStudentId(null)} className="p-1 text-gray-400 hover:bg-gray-100 rounded">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex-1 text-sm font-medium text-gray-900">{student.name}</span>
+                        <button
+                          onClick={() => { setEditingStudentId(student.id); setEditingStudentName(student.name); }}
+                          className="p-1 text-gray-400 hover:text-forest-600 hover:bg-forest-50 rounded"
+                          title="Rename"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteStudent(student.id)}
+                          className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
+                          title="Remove student"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Footer */}
         <div className="p-4 border-t border-gray-200">
