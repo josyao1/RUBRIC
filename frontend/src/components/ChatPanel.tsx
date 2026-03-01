@@ -7,6 +7,8 @@
  */
 import { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { Bot, X, Send, Loader2, AlertCircle } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export interface ChatPanelHandle {
   sendMessage: (msg: string) => void;
@@ -111,7 +113,24 @@ const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(({ onChat }, ref) 
                   {msg.role === 'assistant' && (
                     <Bot className="w-4 h-4 text-forest-500 mb-1" />
                   )}
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                  {msg.role === 'assistant' ? (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        p: ({ children }) => <p className="mb-1 last:mb-0 leading-relaxed">{children}</p>,
+                        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                        em: ({ children }) => <em className="italic">{children}</em>,
+                        ul: ({ children }) => <ul className="list-disc pl-4 my-1 space-y-0.5">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal pl-4 my-1 space-y-0.5">{children}</ol>,
+                        li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                        code: ({ children }) => <code className="bg-gray-200 rounded px-1 text-xs font-mono">{children}</code>,
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
+                  ) : (
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                  )}
                 </div>
               </div>
             ))}

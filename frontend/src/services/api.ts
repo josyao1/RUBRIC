@@ -504,6 +504,17 @@ export interface JoinAssignment {
   students: { id: string; name: string }[];
 }
 
+export interface DraftRevision {
+  id: string;
+  status: string;
+  fileName: string;
+  submittedAt: string;
+  extractedText?: string;
+  inlineComments: InlineComment[];
+  sectionFeedback: SectionFeedback[];
+  overallFeedback?: OverallFeedback;
+}
+
 export interface JoinSubmissionStatus {
   hasSubmission: boolean;
   assignmentName: string;
@@ -517,16 +528,7 @@ export interface JoinSubmissionStatus {
     inlineComments: InlineComment[];
     sectionFeedback: SectionFeedback[];
     overallFeedback?: OverallFeedback;
-    latestRevision?: {
-      id: string;
-      status: string;
-      fileName: string;
-      submittedAt: string;
-      extractedText?: string;
-      inlineComments: InlineComment[];
-      sectionFeedback: SectionFeedback[];
-      overallFeedback?: OverallFeedback;
-    } | null;
+    revisions: DraftRevision[];
   };
 }
 

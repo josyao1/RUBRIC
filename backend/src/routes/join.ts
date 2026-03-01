@@ -209,10 +209,10 @@ router.get('/:code/student/:studentId', async (req, res) => {
       return res.json({ hasSubmission: false, assignmentName: assignment.name });
     }
 
-    // Find latest revision if any
-    const latestRevision = await prisma.submission.findFirst({
+    // Fetch all revisions oldest-first so the frontend can number them Draft 2, 3, …
+    const revisions = await prisma.submission.findMany({
       where: { parentSubmissionId: submission.id },
-      orderBy: { submittedAt: 'desc' },
+      orderBy: { submittedAt: 'asc' },
       include: {
         inlineComments: { include: { criterion: { select: { name: true } } } },
         sectionFeedback: { include: { criterion: { select: { name: true } } } },
@@ -233,16 +233,16 @@ router.get('/:code/student/:studentId', async (req, res) => {
         inlineComments: submission.inlineComments,
         sectionFeedback: submission.sectionFeedback,
         overallFeedback: submission.overallFeedback,
-        latestRevision: latestRevision ? {
-          id: latestRevision.id,
-          status: latestRevision.status,
-          fileName: latestRevision.fileName,
-          submittedAt: latestRevision.submittedAt,
-          extractedText: latestRevision.extractedText,
-          inlineComments: latestRevision.inlineComments,
-          sectionFeedback: latestRevision.sectionFeedback,
-          overallFeedback: latestRevision.overallFeedback
-        } : null
+        revisions: revisions.map(r => ({
+          id: r.id,
+          status: r.status,
+          fileName: r.fileName,
+          submittedAt: r.submittedAt,
+          extractedText: r.extractedText,
+          inlineComments: r.inlineComments,
+          sectionFeedback: r.sectionFeedback,
+          overallFeedback: r.overallFeedback
+        }))
       }
     });
   } catch (error) {
